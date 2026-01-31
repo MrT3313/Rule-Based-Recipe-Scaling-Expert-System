@@ -1,0 +1,92 @@
+% --- The Knowledge Base of Camelot ---
+%
+% This file contains the facts and rules that define the
+% relationships and laws of the kingdom.
+%
+% Constants (e.g., 'Arthur', 'Camelot') start with an uppercase letter.
+% Variables (e.g., 'x', 'p', 'c') start with a lowercase letter.
+%
+% Format:
+% Predicate(Term1, Term2, ...)
+% Antecedent1(x, y) && Antecedent2(y, z) => Consequent(x, z)
+%
+% --- --- --- --- --- --- --- --- --- ---
+
+% --- Facts ---
+
+% --- People & Attributes ---
+Male(Arthur)
+Male(Uther)
+Male(Lancelot)
+Male(Gawain)
+Male(Galahad)
+Male(King_Ban)
+
+Female(Guinevere)
+Female(Igraine)
+Female(Morgana)
+Female(Elaine)
+
+% --- Titles & Roles ---
+King(Arthur)
+Queen(Guinevere)
+King(Uther)
+Queen(Igraine)
+Knight(Lancelot)
+Knight(Gawain)
+MagicUser(Morgana)
+
+% --- Familial Relationships (Parents) ---
+Parent(Uther, Arthur)
+Parent(Igraine, Arthur)
+
+Parent(Uther, Morgana)
+Parent(Igraine, Morgana)
+
+Parent(King_Ban, Lancelot)
+
+Parent(Lancelot, Galahad)
+Parent(Elaine, Galahad)
+
+% --- Loyalties & Allegiances ---
+LoyalTo(Lancelot, Arthur)
+LoyalTo(Gawain, Arthur)
+LoyalTo(Galahad, Arthur)
+
+LoyalTo(Arthur, "Camelot")
+LoyalTo(Uther, "Camelot")
+LoyalTo(Guinevere, "Camelot")
+
+LoyalTo(Morgana, Morgana)
+
+
+% --- Rules ---
+
+% --- Familial Rules ---
+Parent(p, c) && Male(p) => Father(p, c)
+Parent(p, c) && Female(p) => Mother(p, c)
+
+% Rule for siblings (full siblings only)
+Father(f, c1) && Father(f, c2) && Mother(m, c1) && Mother(m, c2) && Male(c1) && Female(c2) => BrotherSister(c1, c2)
+
+% --- Ancestor Rules (Recursive) ---
+Parent(x, y) => Ancestor(x, y)
+Parent(x, z) && Ancestor(z, y) => Ancestor(x, y)
+
+
+% --- Royal & Allegiance Rules ---
+King(k) => IsRuler(k)
+Queen(q) => IsRuler(q)
+
+% A ruler is a good ruler if they are loyal to the kingdom
+IsRuler(r) && LoyalTo(r, "Camelot") => GoodRuler(r)
+
+% A knight serves a ruler if they are loyal to them
+Knight(k) && LoyalTo(k, r) && IsRuler(r) => Serves(k, r)
+
+% --- Treason & Threat Rules ---
+% Being loyal to oneself (and not the kingdom) is treason
+LoyalTo(x, x) => Traitor(x)
+
+% A magic user who is a traitor is a threat
+MagicUser(m) && Traitor(m) => Threat(m)

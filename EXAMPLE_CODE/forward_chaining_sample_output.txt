@@ -1,0 +1,107 @@
+================================================================================
+FORWARD CHAINING SAMPLE OUTPUT
+================================================================================
+
+This file demonstrates the expected output format for Forward Chaining.
+Students should follow this trace format when implementing fol_fc_ask().
+
+================================================================================
+DUMMY KNOWLEDGE BASE
+================================================================================
+
+% --- Facts ---
+Male(Adam)
+Male(Bob)
+Female(Carol)
+Parent(Adam, Bob)
+Parent(Bob, Carol)
+Parent(Carol, Diana)
+
+% --- Rules ---
+Parent(p, c) && Male(p) => Father(p, c)
+Parent(p, c) && Female(p) => Mother(p, c)
+Parent(x, y) => Ancestor(x, y)
+Parent(x, z) && Ancestor(z, y) => Ancestor(x, y)
+
+================================================================================
+EXPECTED OUTPUT TRACE
+================================================================================
+
+Successfully loaded Knowledge Base from dummy.kb.
+  6 facts, 4 rules.
+
+Starting Forward Chaining...
+
+--- Cycle 1 ---
+  Derived: Father(Adam, Bob)
+  Derived: Mother(Carol, Diana)
+  Derived: Ancestor(Adam, Bob)
+  Derived: Ancestor(Bob, Carol)
+  Derived: Ancestor(Carol, Diana)
+
+--- Cycle 2 ---
+  Derived: Ancestor(Adam, Carol)
+  Derived: Ancestor(Bob, Diana)
+
+--- Cycle 3 ---
+  Derived: Ancestor(Adam, Diana)
+
+--- No new facts added. Halting. ---
+
+Forward chaining complete. Final KB size: 14 facts.
+
+================================================================================
+EXPLANATION OF THE TRACE
+================================================================================
+
+Cycle 1:
+  - Rule "Parent(p, c) && Male(p) => Father(p, c)" fires:
+      * Unifies Parent(Adam, Bob) with Male(Adam) -> Father(Adam, Bob)
+
+  - Rule "Parent(p, c) && Female(p) => Mother(p, c)" fires:
+      * Unifies Parent(Carol, Diana) with Female(Carol) -> Mother(Carol, Diana)
+
+  - Rule "Parent(x, y) => Ancestor(x, y)" fires:
+      * From Parent(Adam, Bob) -> Ancestor(Adam, Bob)
+      * From Parent(Bob, Carol) -> Ancestor(Bob, Carol)
+      * From Parent(Carol, Diana) -> Ancestor(Carol, Diana)
+
+Cycle 2:
+  - Rule "Parent(x, z) && Ancestor(z, y) => Ancestor(x, y)" fires:
+      * From Parent(Adam, Bob) && Ancestor(Bob, Carol) -> Ancestor(Adam, Carol)
+      * From Parent(Bob, Carol) && Ancestor(Carol, Diana) -> Ancestor(Bob, Diana)
+
+Cycle 3:
+  - Rule "Parent(x, z) && Ancestor(z, y) => Ancestor(x, y)" fires:
+      * From Parent(Adam, Bob) && Ancestor(Bob, Diana) -> Ancestor(Adam, Diana)
+
+Cycle 4:
+  - No new facts can be derived, so the algorithm halts.
+
+================================================================================
+NOTES FOR STUDENTS
+================================================================================
+
+1. Each cycle attempts to apply all rules to all combinations of facts.
+
+2. Only NEW facts (not already in the KB) are added and printed.
+
+3. The algorithm halts when a complete cycle produces no new facts.
+
+4. Variable standardization ensures that each rule application uses unique
+   variable names (e.g., x_1, y_1, z_1) to prevent collisions.
+
+5. The trace should clearly show WHICH facts were derived in WHICH cycle.
+
+6. The final message shows the total count of facts in the KB (original + derived).
+
+7. IMPORTANT: Your fol_fc_ask() function should print the trace shown above
+   (from "Starting Forward Chaining..." to "Forward chaining complete...").
+
+   The run_logic.py script prints additional output AFTER your function returns:
+   - "Final Inferred Facts (Sorted):" with a numbered list of all facts
+
+   Your function should NOT print this sorted list. Just print the trace and
+   return the list of Predicate objects.
+
+================================================================================
