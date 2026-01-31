@@ -8,6 +8,7 @@ from recipes.chocolate_chip_cookies import chocolate_chip_cookies_recipe
 from classes.KnowledgeBase import KnowledgeBase
 from classes.WorkingMemory import WorkingMemory
 from classes.Fact import Fact
+from classes.InferenceEngine import InferenceEngine
 
 # facts
 from facts.ingredient_classifications import get_ingredient_classification_facts
@@ -132,3 +133,26 @@ if __name__ == "__main__":
 
     print(f"Working Memory Base size: {len(wm.facts)} facts")
     print("")
+
+    print("*"*70)
+    print("⚙️⚙️ RUN INFERENCE ENGINE ⚙️⚙️")
+    print("*"*70)
+    print("")
+    
+    engine = InferenceEngine(wm, kb, conflict_resolution_strategy=args.conflict_resolution, verbose=True)
+    engine.run()
+    
+    print("")
+    print("*"*70)
+    print("FINAL RESULTS")
+    print("*"*70)
+    print("")
+    print(f"Total facts in working memory: {len(wm.facts)}")
+    print("")
+    
+    classified_ingredients = [f for f in wm.facts if f.fact_title == 'classified_ingredient']
+    print(f"Classified ingredients: {len(classified_ingredients)}")
+    for fact in classified_ingredients:
+        print(f"  {fact}")
+    print("")
+
