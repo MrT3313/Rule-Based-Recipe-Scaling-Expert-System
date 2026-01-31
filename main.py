@@ -6,6 +6,8 @@ from recipes.chocolate_chip_cookies import chocolate_chip_cookies_recipe
 
 # classes
 from classes.KnowledgeBase import KnowledgeBase
+from classes.WorkingMemory import WorkingMemory
+from classes.Fact import Fact
 
 # facts
 from facts.ingredient_classifications import get_ingredient_classification_facts
@@ -89,5 +91,33 @@ if __name__ == "__main__":
     print(f"Added {len(measurement_unit_conversions)} measurement unit conversion facts")
     print("")
     
-    print(f"Knowledge Base size: {len(kb.reference_facts)} reference facts")
+    print("*"*70)
+    print("⚙️⚙️ CONFIGURE WORKING MEMORY ⚙️⚙️")
+    print("*"*70)
+    print("")
+    wm = WorkingMemory()
+
+    wm.add_fact(
+        Fact(
+            fact_title='target_recipe_scale_factor', 
+            target_recipe_scale_factor=args.scaling_factor
+        ), 
+        silent=True
+    )
+    print('Added target recipe scale factor fact to working memory')
+    print("")
+
+    for ingredient in recipe.ingredients:
+        wm.add_fact(
+            Fact('ingredient', 
+                ingredient_name=ingredient.ingredient_name, 
+                amount=ingredient.amount, 
+                unit=ingredient.unit
+            ), 
+            silent=True
+        )
+    print(f"Added {len(recipe.ingredients)} recipe ingredient facts to working memory")
+    print("")
+
+    print(f"Working Memory Base size: {len(wm.facts)} facts")
     print("")

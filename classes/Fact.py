@@ -23,3 +23,6 @@ class Fact:
     
     def get(self, key, default=None):
         return self.attributes.get(key, default)
+
+    def set_fact_id(self, fact_id):
+        self.fact_id = fact_id
