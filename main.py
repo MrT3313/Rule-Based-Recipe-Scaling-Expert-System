@@ -1,6 +1,16 @@
+# imports
 import argparse
 
+# recipes
 from recipes.chocolate_chip_cookies import chocolate_chip_cookies_recipe
+
+# classes
+from classes.KnowledgeBase import KnowledgeBase
+
+# facts
+from facts.ingredient_classifications import get_ingredient_classification_facts
+from facts.ingredient_classification_scale_factors import get_ingredient_classification_scale_factor_facts
+from facts.measurement_unit_conversions import get_measurement_unit_conversion_facts
 
 if __name__ == "__main__":
     print("*"*70)
@@ -57,4 +67,27 @@ if __name__ == "__main__":
     print(f"SCALING FACTOR: {args.scaling_factor}x")
     print(f"CONFLICT RESOLUTION: {args.conflict_resolution}")
     print("*"*70)
+    print("")
+
+    print("*"*70)
+    print("⚙️⚙️ CONFIGURE KNOWLEDGE BASE ⚙️⚙️")
+    # The knowledge base holds permanent knowledge: rules and reference facts
+    # Reference facts are static domain "background" knowledge (unit conversions, classifications, etc.)
+    print("*"*70)
+    print("")
+    kb = KnowledgeBase()
+
+    ingredient_classification_facts = get_ingredient_classification_facts()
+    ingredient_classification_scale_factors = get_ingredient_classification_scale_factor_facts()
+    measurement_unit_conversions = get_measurement_unit_conversion_facts()
+
+    kb.add_reference_fact(ingredient_classification_facts)
+    print(f"Added {len(ingredient_classification_facts)} ingredient classification facts")
+    kb.add_reference_fact(ingredient_classification_scale_factors)
+    print(f"Added {len(ingredient_classification_scale_factors)} ingredient classification scale factor facts")
+    kb.add_reference_fact(measurement_unit_conversions)
+    print(f"Added {len(measurement_unit_conversions)} measurement unit conversion facts")
+    print("")
+    
+    print(f"Knowledge Base size: {len(kb.reference_facts)} reference facts")
     print("")
