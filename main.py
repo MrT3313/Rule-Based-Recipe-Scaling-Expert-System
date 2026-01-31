@@ -14,6 +14,9 @@ from facts.ingredient_classifications import get_ingredient_classification_facts
 from facts.ingredient_classification_scale_factors import get_ingredient_classification_scale_factor_facts
 from facts.measurement_unit_conversions import get_measurement_unit_conversion_facts
 
+# rules
+from rules.ingredient_classifications import get_ingredient_classification_rules
+
 if __name__ == "__main__":
     print("*"*70)
     print("FORWARD-CHAINING PRODUCTION SYSTEM: Recipe Scaling")
@@ -91,6 +94,14 @@ if __name__ == "__main__":
     print(f"Added {len(measurement_unit_conversions)} measurement unit conversion facts")
     print("")
     
+    ingredient_classification_rules = get_ingredient_classification_rules()
+    kb.add_rule(ingredient_classification_rules)
+    print(f"Added {len(ingredient_classification_rules)} ingredient classification rules")
+    print("")
+    
+    print(f"Knowledge Base size: {len(kb.reference_facts)} reference facts, {len(kb.rules)} rules")
+    print("")
+
     print("*"*70)
     print("⚙️⚙️ CONFIGURE WORKING MEMORY ⚙️⚙️")
     print("*"*70)
@@ -109,7 +120,7 @@ if __name__ == "__main__":
 
     for ingredient in recipe.ingredients:
         wm.add_fact(
-            Fact('ingredient', 
+            Fact('recipe_ingredient', 
                 ingredient_name=ingredient.ingredient_name, 
                 amount=ingredient.amount, 
                 unit=ingredient.unit
