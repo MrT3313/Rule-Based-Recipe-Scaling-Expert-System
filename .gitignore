@@ -1,1 +1,7 @@
+/.idea/*
+!/.idea/runConfigurations
+.vs_code
+
+__pycache__/
+
 .DS_Store
