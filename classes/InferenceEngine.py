@@ -63,9 +63,38 @@ class InferenceEngine:
         for rule in self.knowledge_base.rules:
             bindings_list = self._match_antecedents(rule.antecedents, {})
             for bindings in bindings_list:
-                derived_fact = self._apply_bindings(rule.consequent, bindings)
+                test_bindings = bindings.copy()
+                if rule.action_fn is not None:
+                    computed_bindings = rule.action_fn(test_bindings, self.working_memory, self.knowledge_base)
+                    test_bindings = {**test_bindings, **computed_bindings}
+                
+                derived_fact = self._apply_bindings(rule.consequent, test_bindings)
                 if not self._fact_exists(derived_fact):
                     matches.append((rule, bindings))
+        return matches
+
+    def _find_rules_using_fact(self, fact):
+        matches = []
+        
+        for rule in self.knowledge_base.rules:
+            for antecedent in rule.antecedents:
+                if isinstance(antecedent, NegatedFact):
+                    continue
+                
+                initial_bindings = self._match_pattern(antecedent, fact, {})
+                if initial_bindings is not None:
+                    bindings_list = self._match_antecedents(rule.antecedents, {})
+                    for bindings in bindings_list:
+                        test_bindings = bindings.copy()
+                        if rule.action_fn is not None:
+                            computed_bindings = rule.action_fn(test_bindings, self.working_memory, self.knowledge_base)
+                            test_bindings = {**test_bindings, **computed_bindings}
+                        
+                        derived_fact = self._apply_bindings(rule.consequent, test_bindings)
+                        if not self._fact_exists(derived_fact):
+                            matches.append((rule, bindings))
+                    break
+        
         return matches
 
     def _apply_bindings(self, fact_template, bindings):
@@ -87,6 +116,39 @@ class InferenceEngine:
                     return True
         return False
 
+    def _fire_rules_dfs(self, depth=0, triggering_fact=None):
+        if triggering_fact is None:
+            matches = self._find_matching_rules()
+        else:
+            matches = self._find_rules_using_fact(triggering_fact)
+        
+        if not matches:
+            return 0
+        
+        selected_rule, bindings = self._resolve_conflict(matches)
+        
+        indent = "\t" * depth
+        if self.verbose:
+            print(f"{indent}Selected: {selected_rule.rule_name} with bindings {bindings}")
+        
+        if selected_rule.action_fn is not None:
+            computed_bindings = selected_rule.action_fn(bindings, self.working_memory, self.knowledge_base)
+            bindings = {**bindings, **computed_bindings}
+        
+        derived_fact = self._apply_bindings(selected_rule.consequent, bindings)
+        
+        derived_fact.set_derivation(
+            fact_id=self.working_memory.next_fact_id,
+            derived_by_rule=selected_rule.rule_name,
+            derived_at_cycle=self.cycle_count,
+            derived_from=[]
+        )
+        self.working_memory.add_fact(derived_fact, indent=indent, silent=not self.verbose)
+        
+        rules_fired_deeper = self._fire_rules_dfs(depth + 1, triggering_fact=derived_fact)
+        
+        return 1 + rules_fired_deeper
+
     def run(self):
         self.cycle_count = 0
         
@@ -102,27 +164,12 @@ class InferenceEngine:
             if self.verbose:
                 print(f"--- Cycle {self.cycle_count} ---")
             
-            matches = self._find_matching_rules()
+            rules_fired = self._fire_rules_dfs()
             
-            if not matches:
+            if rules_fired == 0:
                 if self.verbose:
                     print("No rules can fire. Inference complete.")
                 break
-            
-            selected_rule, bindings = self._resolve_conflict(matches)
-            
-            if self.verbose:
-                print(f"Selected: {selected_rule.rule_name} with bindings {bindings}")
-            
-            derived_fact = self._apply_bindings(selected_rule.consequent, bindings)
-            
-            derived_fact.set_derivation(
-                fact_id=self.working_memory.next_fact_id,
-                derived_by_rule=selected_rule.rule_name,
-                derived_at_cycle=self.cycle_count,
-                derived_from=[]
-            )
-            self.working_memory.add_fact(derived_fact, silent=not self.verbose)
         
         if self.verbose:
             print("")

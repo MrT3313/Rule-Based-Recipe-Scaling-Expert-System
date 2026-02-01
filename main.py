@@ -17,6 +17,8 @@ from facts.measurement_unit_conversions import get_measurement_unit_conversion_f
 
 # rules
 from rules.ingredient_classifications import get_ingredient_classification_rules
+from rules.ingredient_classification_scaling_multiplier import get_ingredient_classification_scaling_multiplier_rules
+from rules.scaled_ingredient import get_scaled_ingredient_rules
 
 if __name__ == "__main__":
     print("*"*70)
@@ -98,6 +100,14 @@ if __name__ == "__main__":
     ingredient_classification_rules = get_ingredient_classification_rules()
     kb.add_rule(ingredient_classification_rules)
     print(f"Added {len(ingredient_classification_rules)} ingredient classification rules")
+    
+    scaling_multiplier_rules = get_ingredient_classification_scaling_multiplier_rules()
+    kb.add_rule(scaling_multiplier_rules)
+    print(f"Added {len(scaling_multiplier_rules)} ingredient scaling multiplier rules")
+    
+    scaled_ingredient_rules = get_scaled_ingredient_rules()
+    kb.add_rule(scaled_ingredient_rules)
+    print(f"Added {len(scaled_ingredient_rules)} scaled ingredient rules")
     print("")
     
     print(f"Knowledge Base size: {len(kb.reference_facts)} reference facts, {len(kb.rules)} rules")
@@ -154,5 +164,22 @@ if __name__ == "__main__":
     print(f"Classified ingredients: {len(classified_ingredients)}")
     for fact in classified_ingredients:
         print(f"  {fact}")
+    print("")
+    
+    scaling_multipliers = [f for f in wm.facts if f.fact_title == 'ingredient_scaling_multiplier']
+    print(f"Ingredient scaling multipliers: {len(scaling_multipliers)}")
+    for fact in scaling_multipliers:
+        print(f"  {fact}")
+    print("")
+    
+    scaled_ingredients = [f for f in wm.facts if f.fact_title == 'scaled_ingredient']
+    print(f"Scaled ingredients: {len(scaled_ingredients)}")
+    for fact in scaled_ingredients:
+        name = fact.get('ingredient_name')
+        original = fact.get('original_amount')
+        scaled = fact.get('scaled_amount')
+        unit = fact.get('unit')
+        multiplier = fact.get('scaling_multiplier')
+        print(f"  {name}: {original} → {scaled:.2f} {unit} (×{multiplier:.2f})")
     print("")
 
