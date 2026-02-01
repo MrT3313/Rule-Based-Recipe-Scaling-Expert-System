@@ -19,6 +19,7 @@ from facts.measurement_unit_conversions import get_measurement_unit_conversion_f
 from rules.ingredient_classifications import get_ingredient_classification_rules
 from rules.ingredient_classification_scaling_multiplier import get_ingredient_classification_scaling_multiplier_rules
 from rules.scaled_ingredient import get_scaled_ingredient_rules
+from rules.optimal_unit_conversion import get_optimal_unit_conversion_rules
 
 if __name__ == "__main__":
     print("*"*70)
@@ -108,6 +109,10 @@ if __name__ == "__main__":
     scaled_ingredient_rules = get_scaled_ingredient_rules()
     kb.add_rule(scaled_ingredient_rules)
     print(f"Added {len(scaled_ingredient_rules)} scaled ingredient rules")
+    
+    optimal_unit_conversion_rules = get_optimal_unit_conversion_rules()
+    kb.add_rule(optimal_unit_conversion_rules)
+    print(f"Added {len(optimal_unit_conversion_rules)} optimal unit conversion rules")
     print("")
     
     print(f"Knowledge Base size: {len(kb.reference_facts)} reference facts, {len(kb.rules)} rules")
@@ -134,7 +139,8 @@ if __name__ == "__main__":
             Fact('recipe_ingredient', 
                 ingredient_name=ingredient.ingredient_name, 
                 amount=ingredient.amount, 
-                unit=ingredient.unit
+                unit=ingredient.unit,
+                measurement_category=ingredient.measurement_category
             ), 
             silent=True
         )
@@ -181,5 +187,40 @@ if __name__ == "__main__":
         unit = fact.get('unit')
         multiplier = fact.get('scaling_multiplier')
         print(f"  {name}: {original} → {scaled:.2f} {unit} (×{multiplier:.2f})")
+    print("")
+    
+    optimal_ingredients = [f for f in wm.facts if f.fact_title == 'optimal_ingredient']
+    print(f"Optimal ingredients: {len(optimal_ingredients)}")
+    for fact in optimal_ingredients:
+        name = fact.get('ingredient_name')
+        components = fact.get('components')
+        original_amount = fact.get('original_amount')
+        original_unit = fact.get('original_unit')
+        
+        if components:
+            conversion_happened = False
+            
+            if len(components) == 1:
+                if components[0]['unit'] != original_unit:
+                    conversion_happened = True
+            else:
+                conversion_happened = True
+            
+            if len(components) > 1:
+                parts = [f"{c['amount']:.4g} {c['unit']}" for c in components]
+                display = " + ".join(parts)
+                if conversion_happened:
+                    print(f"  {name}: {display} (converted from {original_amount:.4g} {original_unit})")
+                else:
+                    print(f"  {name}: {display}")
+            else:
+                amount = components[0]['amount']
+                unit = components[0]['unit']
+                if conversion_happened:
+                    print(f"  {name}: {amount:.4g} {unit} (converted from {original_amount:.4g} {original_unit})")
+                else:
+                    print(f"  {name}: {amount:.4g} {unit}")
+        else:
+            print(f"  {name}: [no components]")
     print("")
 

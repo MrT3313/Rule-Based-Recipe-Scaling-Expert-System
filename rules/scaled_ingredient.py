@@ -11,7 +11,8 @@ def get_scaled_ingredient_rules():
                 Fact('recipe_ingredient',
                      ingredient_name='?ingredient_name',
                      amount='?original_amount',
-                     unit='?unit'),
+                     unit='?unit',
+                     measurement_category='?measurement_category'),
                 Fact('ingredient_scaling_multiplier',
                      ingredient_name='?ingredient_name',
                      scaling_multiplier='?scaling_multiplier')
@@ -21,6 +22,7 @@ def get_scaled_ingredient_rules():
                            original_amount='?original_amount',
                            scaled_amount='?scaled_amount',
                            unit='?unit',
+                           measurement_category='?measurement_category',
                            scaling_multiplier='?scaling_multiplier'),
             action_fn=lambda bindings, wm, kb: {
                 '?scaled_amount': bindings['?original_amount'] * bindings['?scaling_multiplier']
