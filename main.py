@@ -17,9 +17,9 @@ from facts.measurement_unit_conversions import get_measurement_unit_conversion_f
 
 # rules
 from rules.ingredient_classifications import get_ingredient_classification_rules
-from rules.ingredient_classification_scaling_multiplier import get_ingredient_classification_scaling_multiplier_rules
-from rules.scaled_ingredient import get_scaled_ingredient_rules
-from rules.optimal_unit_conversion import get_optimal_unit_conversion_rules
+from rules.ingredient_classification_scaling_multipliers import get_ingredient_classification_scaling_multiplier_rules
+from rules.scaled_ingredients import get_scaled_ingredient_rules
+from rules.optimal_unit_conversions import get_optimal_unit_conversion_rules
 
 if __name__ == "__main__":
     print("*"*70)
