@@ -51,13 +51,13 @@ if __name__ == "__main__":
 
     # Which conflict resolution strategy to use
     # Priority: Use explicit rule priorities (default, best for this domain)
-    # Specificity: More specific rules fire first
-    # Recency: Rules matching newest facts fire first
+    # Recency: gives priority to rules that match the most recently added or modified facts. This strategy assumes that newer information is more relevant to the current problem-solving state.
+    # Specificity: more antecedent conditions = more specific, fires first.
     parser.add_argument(
         "--conflict_resolution",
         type=str,
         default="priority",
-        choices=["priority", "specificity", "recency"],
+        choices=["priority", "recency", "specificity"],
         help="Conflict resolution strategy",
     )
 

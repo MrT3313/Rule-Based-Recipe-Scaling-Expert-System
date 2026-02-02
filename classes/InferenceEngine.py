@@ -105,6 +105,15 @@ class InferenceEngine:
         return Fact(fact_template.fact_title, **new_attributes)
 
     def _resolve_conflict(self, matches):
+        if self.conflict_resolution_strategy == "specificity":
+            return max(matches, key=lambda x: len(x[0].antecedents))
+        if self.conflict_resolution_strategy == "recency":
+            return max(
+                matches,
+                key=lambda x: max(
+                    (f.fact_id for f in x[2] if f.fact_id is not None), default=0
+                ),
+            )
         return max(matches, key=lambda x: x[0].priority)
 
     def _fact_exists(self, fact):
