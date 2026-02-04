@@ -1,7 +1,3 @@
-from classes.Rule import Rule
-from classes.Fact import Fact
-
-
 def is_quarter_increment(value):
     remainder = (value * 4) % 1
     return abs(remainder) < 0.0001 or abs(remainder - 1) < 0.0001
@@ -123,33 +119,3 @@ def calculate_optimal_unit(bindings, wm, kb):
         '?original_amount': scaled_amount
     }
 
-
-def get_optimal_unit_conversion_rules():
-    rules = []
-    
-    rules.append(
-        Rule(
-            antecedents=[
-                Fact('scaled_ingredient',
-                     ingredient_name='?ingredient_name',
-                     scaled_amount='?scaled_amount',
-                     unit='?unit',
-                     measurement_category='?measurement_category'),
-                Fact('unit_conversion',
-                     unit='?unit',
-                     to_base='?current_to_base',
-                     base_unit='?base_unit',
-                     measurement_type='?measurement_category')
-            ],
-            consequent=Fact('optimal_ingredient',
-                           ingredient_name='?ingredient_name',
-                           components='?optimal_components',
-                           original_amount='?original_amount',
-                           original_unit='?unit'),
-            action_fn=calculate_optimal_unit,
-            priority=400,
-            rule_name='convert_to_optimal_unit'
-        )
-    )
-    
-    return rules
