@@ -10,14 +10,6 @@ class ScalingEngine(InferenceEngine):
         if self.conflict_resolution_strategy == "specificity":
             # match based on the most antecedents
             return max(matches, key=lambda x: len(x[0].antecedents))
-        if self.conflict_resolution_strategy == "recency":
-            # match based on the most recently derived fact (highest fact_id
-            return max(
-                matches,
-                key=lambda x: max(
-                    (f.fact_id for f in x[2] if f.fact_id is not None), default=0
-                ),
-            )
         # (default) match based on rule priority
         return max(matches, key=lambda x: x[0].priority)
 

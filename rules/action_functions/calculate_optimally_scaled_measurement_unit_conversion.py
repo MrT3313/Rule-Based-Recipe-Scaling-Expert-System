@@ -1,10 +1,21 @@
+TOLERANCE = 0.0001
+SMALL_UNITS = {'PINCH', 'DASH'}
+
+
+def _find_smallest_unit(*, units_sorted):
+    return next(
+        (f for f in reversed(units_sorted) if f.attributes['unit'] not in SMALL_UNITS),
+        units_sorted[-1]
+    )
+
+
 def is_quarter_increment(*, value):
     remainder = (value * 4) % 1
-    return abs(remainder) < 0.0001 or abs(remainder - 1) < 0.0001
+    return abs(remainder) < TOLERANCE or abs(remainder - 1) < TOLERANCE
 
 
 def is_clean_value(*, value):
-    return abs(value - round(value)) < 0.0001 or is_quarter_increment(value=value)
+    return abs(value - round(value)) < TOLERANCE or is_quarter_increment(value=value)
 
 
 def break_down_to_clean_units(*, base_amount, unit_conversions, measurement_type):
@@ -22,7 +33,7 @@ def break_down_to_clean_units(*, base_amount, unit_conversions, measurement_type
         unit_name = unit_fact.attributes['unit']
         to_base_value = unit_fact.attributes['to_base']
 
-        if unit_name in ['PINCH', 'DASH']:
+        if unit_name in SMALL_UNITS:
             continue
 
         if to_base_value == base_to_base:
@@ -40,7 +51,7 @@ def break_down_to_clean_units(*, base_amount, unit_conversions, measurement_type
         unit_name = unit_fact.attributes['unit']
         to_base_value = unit_fact.attributes['to_base']
 
-        if unit_name in ['PINCH', 'DASH']:
+        if unit_name in SMALL_UNITS:
             continue
 
         if remaining >= to_base_value:
@@ -49,14 +60,11 @@ def break_down_to_clean_units(*, base_amount, unit_conversions, measurement_type
                 components.append({'amount': float(whole_part), 'unit': unit_name})
                 remaining = remaining - (whole_part * to_base_value)
 
-        if remaining < 0.0001:
+        if remaining < TOLERANCE:
             break
 
-    if remaining > 0.0001:
-        smallest_unit = next(
-            (f for f in reversed(units_sorted) if f.attributes['unit'] not in ['PINCH', 'DASH']),
-            units_sorted[-1]
-        )
+    if remaining > TOLERANCE:
+        smallest_unit = _find_smallest_unit(units_sorted=units_sorted)
         smallest_to_base = smallest_unit.attributes['to_base']
         final_amount = remaining / smallest_to_base
 
@@ -66,10 +74,7 @@ def break_down_to_clean_units(*, base_amount, unit_conversions, measurement_type
         components.append({'amount': final_amount, 'unit': smallest_unit.attributes['unit']})
 
     if not components:
-        smallest_unit = next(
-            (f for f in reversed(units_sorted) if f.attributes['unit'] not in ['PINCH', 'DASH']),
-            units_sorted[-1]
-        )
+        smallest_unit = _find_smallest_unit(units_sorted=units_sorted)
         return [{'amount': 0.0, 'unit': smallest_unit.attributes['unit']}]
 
     all_clean = all(is_clean_value(value=c['amount']) for c in components)
@@ -83,10 +88,7 @@ def break_down_to_clean_units(*, base_amount, unit_conversions, measurement_type
                              if f.attributes['unit'] == c['unit'])
             for c in components
         )
-        smallest_unit = next(
-            (f for f in reversed(units_sorted) if f.attributes['unit'] not in ['PINCH', 'DASH']),
-            units_sorted[-1]
-        )
+        smallest_unit = _find_smallest_unit(units_sorted=units_sorted)
         simple_amount = total_in_base / smallest_unit.attributes['to_base']
 
         return [{'amount': simple_amount, 'unit': smallest_unit.attributes['unit']}]
@@ -98,7 +100,7 @@ def calculate_optimal_unit(*, bindings, wm, kb):
     current_to_base = bindings['?current_to_base']
     measurement_type = bindings['?measurement_category']
 
-    if current_unit in ['PINCH', 'DASH']:
+    if current_unit in SMALL_UNITS:
         return {
             '?optimal_components': [{'amount': scaled_amount, 'unit': current_unit}],
             '?original_amount': scaled_amount
