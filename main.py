@@ -61,6 +61,12 @@ if __name__ == "__main__":
         help="Conflict resolution strategy",
     )
 
+    parser.add_argument(
+        "--explain",
+        default=False,
+        help="Run interactive explanation REPL at the end",
+    )
+
     args = parser.parse_args()
     print("")
 
@@ -233,29 +239,30 @@ if __name__ == "__main__":
         print(f"  #{fact.fact_id}  {fact}")
     print("")
 
-    explainer = ExplanationComponent(wm)
-    print("*"*70)
-    print("EXPLANATION: Enter fact ID, 'list' to relist facts, or 'q' to quit")
-    print("*"*70)
-    print("")
-    while True:
-        try:
-            raw = input("Enter fact ID, 'list' to relist facts, or 'q' to quit: ").strip().lower()
-        except EOFError:
-            break
-        if raw in ("q", "quit", ""):
-            break
-        if raw in ("list", "l"):
-            print("")
-            for fact in wm.facts:
-                print(f"  #{fact.fact_id}  {fact}")
-            print("")
-            continue
-        try:
-            fact_id = int(raw)
-        except ValueError:
-            print("Invalid input. Enter a fact ID (number), 'list', or 'q' to quit.")
-            continue
+    if args.explain:
+        explainer = ExplanationComponent(wm)
+        print("*"*70)
+        print("EXPLANATION: Enter fact ID, 'list' to relist facts, or 'q' to quit")
+        print("*"*70)
         print("")
-        print(explainer.explain(fact_id))
-        print("")
+        while True:
+            try:
+                raw = input("Enter fact ID, 'list' to relist facts, or 'q' to quit: ").strip().lower()
+            except EOFError:
+                break
+            if raw in ("q", "quit", ""):
+                break
+            if raw in ("list", "l"):
+                print("")
+                for fact in wm.facts:
+                    print(f"  #{fact.fact_id}  {fact}")
+                print("")
+                continue
+            try:
+                fact_id = int(raw)
+            except ValueError:
+                print("Invalid input. Enter a fact ID (number), 'list', or 'q' to quit.")
+                continue
+            print("")
+            print(explainer.explain(fact_id))
+            print("")
