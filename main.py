@@ -98,31 +98,31 @@ if __name__ == "__main__":
     ingredient_classification_scale_factors = get_ingredient_classification_scale_factor_facts()
     measurement_unit_conversions = get_measurement_unit_conversion_facts()
 
-    kb.add_reference_fact(ingredient_classification_facts)
+    kb.add_reference_fact(fact=ingredient_classification_facts)
     print(f"Added {len(ingredient_classification_facts)} ingredient classification facts")
-    kb.add_reference_fact(ingredient_classification_scale_factors)
+    kb.add_reference_fact(fact=ingredient_classification_scale_factors)
     print(f"Added {len(ingredient_classification_scale_factors)} ingredient classification scale factor facts")
-    kb.add_reference_fact(measurement_unit_conversions)
+    kb.add_reference_fact(fact=measurement_unit_conversions)
     print(f"Added {len(measurement_unit_conversions)} measurement unit conversion facts")
     print("")
-    
+
     ingredient_classification_rules = get_ingredient_classification_rules()
-    kb.add_rule(ingredient_classification_rules)
+    kb.add_rule(rule=ingredient_classification_rules)
     print(f"Added {len(ingredient_classification_rules)} ingredient classification rules")
-    
+
     scaling_multiplier_rules = get_ingredient_classification_scaling_multiplier_rules()
-    kb.add_rule(scaling_multiplier_rules)
+    kb.add_rule(rule=scaling_multiplier_rules)
     print(f"Added {len(scaling_multiplier_rules)} ingredient scaling multiplier rules")
-    
+
     scaled_ingredient_rules = get_scaled_ingredient_rules()
-    kb.add_rule(scaled_ingredient_rules)
+    kb.add_rule(rule=scaled_ingredient_rules)
     print(f"Added {len(scaled_ingredient_rules)} scaled ingredient rules")
-    
+
     optimal_unit_conversion_rules = get_optimal_unit_conversion_rules()
-    kb.add_rule(optimal_unit_conversion_rules)
+    kb.add_rule(rule=optimal_unit_conversion_rules)
     print(f"Added {len(optimal_unit_conversion_rules)} optimal unit conversion rules")
     print("")
-    
+
     print(f"Knowledge Base size: {len(kb.reference_facts)} reference facts, {len(kb.rules)} rules")
     print("")
 
@@ -133,10 +133,10 @@ if __name__ == "__main__":
     wm = WorkingMemory()
 
     wm.add_fact(
-        Fact(
-            fact_title='target_recipe_scale_factor', 
+        fact=Fact(
+            fact_title='target_recipe_scale_factor',
             target_recipe_scale_factor=args.scaling_factor
-        ), 
+        ),
         silent=True
     )
     print('Added target recipe scale factor fact to working memory')
@@ -144,12 +144,12 @@ if __name__ == "__main__":
 
     for ingredient in recipe.ingredients:
         wm.add_fact(
-            Fact('recipe_ingredient', 
-                ingredient_name=ingredient.ingredient_name, 
-                amount=ingredient.amount, 
+            fact=Fact(fact_title='recipe_ingredient',
+                ingredient_name=ingredient.ingredient_name,
+                amount=ingredient.amount,
                 unit=ingredient.unit,
                 measurement_category=ingredient.measurement_category
-            ), 
+            ),
             silent=True
         )
     print(f"Added {len(recipe.ingredients)} recipe ingredient facts to working memory")
@@ -162,10 +162,10 @@ if __name__ == "__main__":
     print("⚙️⚙️ RUN INFERENCE ENGINE ⚙️⚙️")
     print("*"*70)
     print("")
-    
-    SCALING_ENGINE = ScalingEngine(wm, kb, conflict_resolution_strategy=args.conflict_resolution, verbose=True)
+
+    SCALING_ENGINE = ScalingEngine(wm=wm, kb=kb, conflict_resolution_strategy=args.conflict_resolution, verbose=True)
     SCALING_ENGINE.run()
-    
+
     print("")
     print("*"*70)
     print("FINAL RESULTS")
@@ -173,47 +173,47 @@ if __name__ == "__main__":
     print("")
     print(f"Total facts in working memory: {len(wm.facts)}")
     print("")
-    
+
     classified_ingredients = [f for f in wm.facts if f.fact_title == 'classified_ingredient']
     print(f"Classified ingredients: {len(classified_ingredients)}")
     for fact in classified_ingredients:
         print(f"  {fact}")
     print("")
-    
+
     scaling_multipliers = [f for f in wm.facts if f.fact_title == 'ingredient_scaling_multiplier']
     print(f"Ingredient scaling multipliers: {len(scaling_multipliers)}")
     for fact in scaling_multipliers:
         print(f"  {fact}")
     print("")
-    
+
     scaled_ingredients = [f for f in wm.facts if f.fact_title == 'scaled_ingredient']
     print(f"Scaled ingredients: {len(scaled_ingredients)}")
     for fact in scaled_ingredients:
-        name = fact.get('ingredient_name')
-        original = fact.get('original_amount')
-        scaled = fact.get('scaled_amount')
-        unit = fact.get('unit')
-        multiplier = fact.get('scaling_multiplier')
+        name = fact.get(key='ingredient_name')
+        original = fact.get(key='original_amount')
+        scaled = fact.get(key='scaled_amount')
+        unit = fact.get(key='unit')
+        multiplier = fact.get(key='scaling_multiplier')
         print(f"  {name}: {original} → {scaled:.2f} {unit} (×{multiplier:.2f})")
     print("")
-    
+
     optimal_ingredients = [f for f in wm.facts if f.fact_title == 'optimally_scaled_ingredient']
     print(f"Optimal ingredients: {len(optimal_ingredients)}")
     for fact in optimal_ingredients:
-        name = fact.get('ingredient_name')
-        components = fact.get('components')
-        original_amount = fact.get('original_amount')
-        original_unit = fact.get('original_unit')
-        
+        name = fact.get(key='ingredient_name')
+        components = fact.get(key='components')
+        original_amount = fact.get(key='original_amount')
+        original_unit = fact.get(key='original_unit')
+
         if components:
             conversion_happened = False
-            
+
             if len(components) == 1:
                 if components[0]['unit'] != original_unit:
                     conversion_happened = True
             else:
                 conversion_happened = True
-            
+
             if len(components) > 1:
                 parts = [f"{c['amount']:.4g} {c['unit']}" for c in components]
                 display = " + ".join(parts)

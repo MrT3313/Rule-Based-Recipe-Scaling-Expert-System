@@ -1,5 +1,5 @@
 class Ingredient:
-    def __init__(self, name, amount, unit, measurement_category):
+    def __init__(self, *, name, amount, unit, measurement_category):
         self.ingredient_name = name.upper().replace(" ", "_").replace("-", "_")
         self.amount = amount
         self.unit = unit.upper().replace(" ", "_").replace("-", "_")
