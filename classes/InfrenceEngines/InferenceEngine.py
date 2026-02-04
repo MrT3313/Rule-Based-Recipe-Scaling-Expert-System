@@ -34,11 +34,9 @@ class InferenceEngine:
         
         return new_bindings
 
-    def _match_antecedents(self, antecedents, bindings, derivation_path=None):
-        if derivation_path is None:
-            derivation_path = []
+    def _match_antecedents(self, antecedents, bindings):
         if not antecedents:
-            return [(bindings, derivation_path)]
+            return [bindings]
 
         first_antecedent = antecedents[0]
         rest_antecedents = antecedents[1:]
@@ -49,14 +47,14 @@ class InferenceEngine:
             for fact in all_facts:
                 if self._match_pattern(pattern, fact, bindings) is not None:
                     return []
-            return self._match_antecedents(rest_antecedents, bindings, derivation_path)
+            return self._match_antecedents(rest_antecedents, bindings)
 
         results = []
         for fact in all_facts:
             new_bindings = self._match_pattern(first_antecedent, fact, bindings)
             if new_bindings is not None:
                 sub_results = self._match_antecedents(
-                    rest_antecedents, new_bindings, derivation_path + [fact]
+                    rest_antecedents, new_bindings
                 )
                 results.extend(sub_results)
         return results
@@ -64,15 +62,15 @@ class InferenceEngine:
     def _find_matching_rules(self):
         matches = []
         for rule in self.knowledge_base.rules:
-            bindings_support_list = self._match_antecedents(rule.antecedents, {})
-            for bindings, derivation_path in bindings_support_list:
+            bindings_list = self._match_antecedents(rule.antecedents, {})
+            for bindings in bindings_list:
                 test_bindings = bindings.copy()
                 if rule.action_fn is not None:
                     computed_bindings = rule.action_fn(test_bindings, self.working_memory, self.knowledge_base)
                     test_bindings = {**test_bindings, **computed_bindings}
                 derived_fact = self._apply_bindings(rule.consequent, test_bindings)
                 if not self._fact_exists(derived_fact):
-                    matches.append((rule, bindings, derivation_path))
+                    matches.append((rule, bindings))
         return matches
 
     def _find_rules_using_fact(self, fact):
@@ -83,15 +81,15 @@ class InferenceEngine:
                     continue
                 initial_bindings = self._match_pattern(antecedent, fact, {})
                 if initial_bindings is not None:
-                    bindings_support_list = self._match_antecedents(rule.antecedents, {})
-                    for bindings, derivation_path in bindings_support_list:
+                    bindings_list = self._match_antecedents(rule.antecedents, {})
+                    for bindings in bindings_list:
                         test_bindings = bindings.copy()
                         if rule.action_fn is not None:
                             computed_bindings = rule.action_fn(test_bindings, self.working_memory, self.knowledge_base)
                             test_bindings = {**test_bindings, **computed_bindings}
                         derived_fact = self._apply_bindings(rule.consequent, test_bindings)
                         if not self._fact_exists(derived_fact):
-                            matches.append((rule, bindings, derivation_path))
+                            matches.append((rule, bindings))
                     break
         return matches
 
@@ -107,13 +105,6 @@ class InferenceEngine:
     def _resolve_conflict(self, matches):
         if self.conflict_resolution_strategy == "specificity":
             return max(matches, key=lambda x: len(x[0].antecedents))
-        if self.conflict_resolution_strategy == "recency":
-            return max(
-                matches,
-                key=lambda x: max(
-                    (f.fact_id for f in x[2] if f.fact_id is not None), default=0
-                ),
-            )
         return max(matches, key=lambda x: x[0].priority)
 
     def _fact_exists(self, fact):
@@ -133,7 +124,7 @@ class InferenceEngine:
         if not matches:
             return False
         
-        selected_rule, bindings, derivation_path = self._resolve_conflict(matches)
+        selected_rule, bindings = self._resolve_conflict(matches)
 
         indent = "\t" * depth
         if self.verbose:
@@ -144,12 +135,6 @@ class InferenceEngine:
             bindings = {**bindings, **computed_bindings}
 
         derived_fact = self._apply_bindings(selected_rule.consequent, bindings)
-        derived_fact.set_derivation(
-            fact_id=self.working_memory.next_fact_id,
-            derived_by_rule=selected_rule.rule_name,
-            derived_at_cycle=self.cycle_count,
-            derived_from=derivation_path,
-        )
         self.working_memory.add_fact(derived_fact, indent=indent, silent=not self.verbose)
         
         rules_fired_deeper = self._fire_rules_dfs(depth + 1, triggering_fact=derived_fact)

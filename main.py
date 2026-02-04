@@ -61,12 +61,12 @@ if __name__ == "__main__":
         help="Conflict resolution strategy",
     )
 
-    # parser.add_argument(
-    #     "--explain",
-    #     action="store_true",
-    #     default=False,
-    #     help="Run interactive explanation REPL at the end",
-    # )
+    parser.add_argument(
+        "--explain",
+        action="store_true",
+        default=False,
+        help="Run interactive explanation REPL at the end",
+    )
 
     args = parser.parse_args()
     print("")

@@ -4,16 +4,6 @@ class Fact:
         self.attributes = attributes
 
         self.fact_id = None
-        self.derived_from = []
-        self.derived_by_rule = None
-        self.derived_at_cycle = None
-    
-    def set_derivation(self, fact_id, derived_by_rule=None, derived_at_cycle=None, derived_from=None):
-        self.fact_id = fact_id
-        self.derived_by_rule = derived_by_rule
-        self.derived_at_cycle = derived_at_cycle
-        if derived_from:
-            self.derived_from = derived_from
     
     def __repr__(self):
         attrs = ', '.join(f"{k}={v}" for k, v in self.attributes.items())
