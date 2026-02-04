@@ -168,4 +168,4 @@ class InferenceEngine:
 
             return 1 + rules_fired_deeper
 
-        return False
+        return 0
