@@ -109,11 +109,6 @@ class InferenceEngine:
                 new_attributes[key] = value
         return Fact(fact_template.fact_title, **new_attributes)
 
-    def _resolve_conflict(self, matches):
-        if self.conflict_resolution_strategy == "specificity":
-            return max(matches, key=lambda x: len(x[0].antecedents))
-        return max(matches, key=lambda x: x[0].priority)
-
     def _fact_exists(self, fact):
         for existing_fact in self.working_memory.facts:
             if existing_fact.fact_title == fact.fact_title:
