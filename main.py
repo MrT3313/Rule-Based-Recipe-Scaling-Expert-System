@@ -5,10 +5,10 @@ import argparse
 from recipes.chocolate_chip_cookies import chocolate_chip_cookies_recipe
 
 # classes
+from classes.InfrenceEngines.ScalingEngine import ScalingEngine
 from classes.KnowledgeBase import KnowledgeBase
 from classes.WorkingMemory import WorkingMemory
 from classes.Fact import Fact
-from classes.InferenceEngine import InferenceEngine
 from classes.ExplanationComponent import ExplanationComponent
 
 # facts
@@ -63,6 +63,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--explain",
+        action="store_true",
         default=False,
         help="Run interactive explanation REPL at the end",
     )
@@ -162,8 +163,8 @@ if __name__ == "__main__":
     print("*"*70)
     print("")
     
-    engine = InferenceEngine(wm, kb, conflict_resolution_strategy=args.conflict_resolution, verbose=True)
-    engine.run()
+    SCALING_ENGINE = ScalingEngine(wm, kb, conflict_resolution_strategy=args.conflict_resolution, verbose=True)
+    SCALING_ENGINE.run()
     
     print("")
     print("*"*70)
