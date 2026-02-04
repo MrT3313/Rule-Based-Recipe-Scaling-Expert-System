@@ -87,20 +87,34 @@ class InferenceEngine:
         return matches
 
     def _find_rules_using_fact(self, fact):
+        """Narrow version of _find_matching_rules: only consider rules that reference the given fact.
+
+        For each rule, scan its antecedents for one that pattern-matches the triggering fact
+        (cheap single-pattern check). If found, do a full match of ALL the rule's antecedents
+        against working memory + reference facts to collect every valid binding set.
+        """
         matches = []
         for rule in self.knowledge_base.rules:
             for antecedent in rule.antecedents:
+                # Negated antecedents don't positively use a fact, so skip them
                 if isinstance(antecedent, NegatedFact):
                     continue
+
+                # Cheap filter: does this single antecedent unify with the triggering fact?
                 initial_bindings = self._match_pattern(antecedent, fact, {})
                 if initial_bindings is not None:
+                    # Passed the filter — now do a full match of ALL antecedents from scratch
+                    # (starts with empty bindings, checks every antecedent against all known facts)
                     bindings_list = self._match_antecedents(rule.antecedents, {})
                     for bindings in bindings_list:
                         matches.append((rule, bindings))
+                    # Break: we already fully evaluated this rule, checking more antecedents
+                    # of the same rule would just produce duplicates
                     break
         return matches
 
     def _apply_bindings(self, fact_template, bindings):
+        """Substitute variables in a fact template with bound values to produce a concrete Fact."""
         new_attributes = {}
         for key, value in fact_template.attributes.items():
             if isinstance(value, str) and value.startswith('?'):
@@ -110,6 +124,7 @@ class InferenceEngine:
         return Fact(fact_template.fact_title, **new_attributes)
 
     def _fact_exists(self, fact):
+        """Check if an identical fact is already in working memory."""
         for existing_fact in self.working_memory.facts:
             if existing_fact.fact_title == fact.fact_title:
                 if existing_fact.attributes == fact.attributes:
@@ -117,16 +132,19 @@ class InferenceEngine:
         return False
 
     def _fire_rules_dfs(self, depth=0, triggering_fact=None):
+        """Fire one matching rule, then recursively chase any new rules enabled by the derived fact."""
+
+        # Broad search on first call 
+        # Narrowed to triggering fact on recursive calls
         if triggering_fact is None:
             matches = self._find_matching_rules()
         else:
-            # we have just derived a new fact and want to check if there are NEW rules that can fire based SOLELY on this new rule
             matches = self._find_rules_using_fact(triggering_fact)
 
         while matches:
             selected_rule, bindings = self._resolve_conflict(matches)
 
-            # Compute final bindings and derive the consequent fact
+            # Run the rule's action function (if any) to compute extra bindings
             final_bindings = bindings.copy()
             if selected_rule.action_fn is not None:
                 computed_bindings = selected_rule.action_fn(final_bindings, self.working_memory, self.knowledge_base)
@@ -134,7 +152,7 @@ class InferenceEngine:
 
             derived_fact = self._apply_bindings(selected_rule.consequent, final_bindings)
 
-            # If this fact already exists, discard this match and try the next best
+            # Skip duplicate facts — try the next candidate instead
             if self._fact_exists(derived_fact):
                 matches.remove((selected_rule, bindings))
                 continue
@@ -145,6 +163,7 @@ class InferenceEngine:
 
             self.working_memory.add_fact(derived_fact, indent=indent, silent=not self.verbose)
 
+            # Recurse: chase any rules newly enabled by the derived fact
             rules_fired_deeper = self._fire_rules_dfs(depth + 1, triggering_fact=derived_fact)
 
             return 1 + rules_fired_deeper
