@@ -154,30 +154,3 @@ class InferenceEngine:
         rules_fired_deeper = self._fire_rules_dfs(depth + 1, triggering_fact=derived_fact)
         
         return 1 + rules_fired_deeper
-
-    def run(self):
-        self.cycle_count = 0
-        
-        if self.verbose:
-            print("="*70)
-            print("STARTING FORWARD CHAINING INFERENCE ENGINE (DFS)")
-            print("="*70)
-            print("")
-        
-        while True:
-            self.cycle_count += 1
-            
-            if self.verbose:
-                print(f"--- Cycle {self.cycle_count} ---")
-            
-            rules_fired = self._fire_rules_dfs()
-            
-            if rules_fired == 0:
-                if self.verbose:
-                    print("No rules can fire. Inference complete.")
-                break
-        
-        if self.verbose:
-            print("")
-            print(f"Inference complete after {self.cycle_count} cycles")
-            print(f"Working memory now contains {len(self.working_memory.facts)} facts")
