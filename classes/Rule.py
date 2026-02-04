@@ -1,5 +1,5 @@
 class Rule:
-    def __init__(self, antecedents, consequent, priority=0, rule_name=None, action_fn=None):
+    def __init__(self, *, antecedents, consequent, priority=0, rule_name=None, action_fn=None):
         self.antecedents = antecedents
         self.consequent = consequent
         self.priority = priority

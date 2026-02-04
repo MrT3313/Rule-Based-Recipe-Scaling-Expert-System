@@ -1,6 +1,6 @@
 class Recipe:
     """Represents a recipe"""
-    def __init__(self, name, ingredients):
+    def __init__(self, *, name, ingredients):
         self.name = name
         self.ingredients = ingredients
 

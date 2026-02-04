@@ -2,10 +2,10 @@ from classes.InfrenceEngines.InferenceEngine import InferenceEngine
 
 
 class ScalingEngine(InferenceEngine):
-    def __init__(self, wm, kb, conflict_resolution_strategy='priority', verbose=True):
-        super().__init__(wm, kb, conflict_resolution_strategy, verbose)
+    def __init__(self, *, wm, kb, conflict_resolution_strategy='priority', verbose=True):
+        super().__init__(wm=wm, kb=kb, conflict_resolution_strategy=conflict_resolution_strategy, verbose=verbose)
 
-    def _resolve_conflict(self, matches):
+    def _resolve_conflict(self, *, matches):
         # TODO: should this be a rule we fetch from wm instead of a key:value on the ScalingEngine class?
         if self.conflict_resolution_strategy == "specificity":
             # match based on the most antecedents
