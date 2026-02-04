@@ -127,10 +127,11 @@ class InferenceEngine:
         if triggering_fact is None:
             matches = self._find_matching_rules()
         else:
+            # we have just derived a new fact and want to check if there are NEW rules that can fire based SOLELY on this new rule
             matches = self._find_rules_using_fact(triggering_fact)
         
         if not matches:
-            return 0
+            return False
         
         selected_rule, bindings, derivation_path = self._resolve_conflict(matches)
 

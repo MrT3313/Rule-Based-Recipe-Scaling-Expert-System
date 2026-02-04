@@ -6,15 +6,19 @@ class ScalingEngine(InferenceEngine):
         super().__init__(wm, kb, conflict_resolution_strategy, verbose)
 
     def _resolve_conflict(self, matches):
+        # TODO: should this be a rule we fetch from wm instead of a key:value on the ScalingEngine class?
         if self.conflict_resolution_strategy == "specificity":
+            # match based on the most antecedents
             return max(matches, key=lambda x: len(x[0].antecedents))
         if self.conflict_resolution_strategy == "recency":
+            # match based on the most recently derived fact (highest fact_id
             return max(
                 matches,
                 key=lambda x: max(
                     (f.fact_id for f in x[2] if f.fact_id is not None), default=0
                 ),
             )
+        # (default) match based on rule priority
         return max(matches, key=lambda x: x[0].priority)
 
     def run(self):
@@ -34,7 +38,7 @@ class ScalingEngine(InferenceEngine):
 
             rules_fired = self._fire_rules_dfs()
 
-            if rules_fired == 0:
+            if not rules_fired:
                 if self.verbose:
                     print("No rules can fire. Inference complete.")
                 break
