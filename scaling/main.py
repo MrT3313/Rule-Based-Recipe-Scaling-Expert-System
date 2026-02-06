@@ -32,19 +32,19 @@ def main(*, wm, kb, recipe, args):
     print("")
 
     ingredient_classification_rules = get_ingredient_classification_rules()
-    kb.add_rule(rule=ingredient_classification_rules)
+    kb.add_rules(rules=ingredient_classification_rules)
     print(f"Added {len(ingredient_classification_rules)} ingredient classification rules")
 
     scaling_multiplier_rules = get_ingredient_classification_scaling_multiplier_rules()
-    kb.add_rule(rule=scaling_multiplier_rules)
+    kb.add_rules(rules=scaling_multiplier_rules)
     print(f"Added {len(scaling_multiplier_rules)} ingredient scaling multiplier rules")
 
     scaled_ingredient_rules = get_scaled_ingredient_rules()
-    kb.add_rule(rule=scaled_ingredient_rules)
+    kb.add_rules(rules=scaled_ingredient_rules)
     print(f"Added {len(scaled_ingredient_rules)} scaled ingredient rules")
 
     optimal_unit_conversion_rules = get_optimal_unit_conversion_rules()
-    kb.add_rule(rule=optimal_unit_conversion_rules)
+    kb.add_rules(rules=optimal_unit_conversion_rules)
     print(f"Added {len(optimal_unit_conversion_rules)} optimal unit conversion rules")
     print("")
 
