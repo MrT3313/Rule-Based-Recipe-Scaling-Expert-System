@@ -1,4 +1,4 @@
-from classes.InfrenceEngines.InferenceEngine import InferenceEngine
+from classes.InferenceEngine import InferenceEngine
 
 
 class ScalingEngine(InferenceEngine):
