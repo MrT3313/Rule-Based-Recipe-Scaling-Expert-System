@@ -22,6 +22,7 @@ def main(*, wm, kb, recipe, args):
         equipment_id=1,
         # state='AVAILABLE'
         state='DIRTY' # TESTING
+        # state = 'IN_USE'  # TESTING
     ), silent=True)
     wm.add_fact(fact=Fact(
         fact_title='EQUIPMENT', 
@@ -67,6 +68,11 @@ def main(*, wm, kb, recipe, args):
     print("")
 
     PLANNING_ENGINE = PlanningEngine(wm=wm, kb=kb, verbose=True)
-    PLANNING_ENGINE.run(recipe=recipe)
+    success, result = PLANNING_ENGINE.run(recipe=recipe)
 
-    exit()
+    if not success:
+        print(f"\n❌ Planning failed: {result}")
+    else:
+        print(f"\n✅ Planning complete — {len(result)} action(s) in plan")
+
+    return success, result
