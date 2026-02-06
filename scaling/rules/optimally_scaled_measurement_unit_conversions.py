@@ -4,7 +4,7 @@ from classes.Fact import Fact
 from classes.NegatedFact import NegatedFact
 
 # action functions
-from rules.action_functions.calculate_optimally_scaled_measurement_unit_conversion import calculate_optimal_unit
+from scaling.rules.action_functions.calculate_optimally_scaled_measurement_unit_conversion import calculate_optimal_unit
 
 
 def get_optimal_unit_conversion_rules():
