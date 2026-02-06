@@ -4,6 +4,10 @@ from classes.Fact import Fact
 
 # rules
 from planning.rules.equipment_status import get_equipment_status_rules
+from planning.rules.ingredient_rules import get_ingredient_rules
+
+# reference facts
+from scaling.facts.measurement_unit_conversions import get_measurement_unit_conversion_facts
 
 def main(*, wm, kb, recipe, args):
     print("*"*70)
@@ -30,14 +34,9 @@ def main(*, wm, kb, recipe, args):
         equipment_name='BOWL',
         equipment_id=1,
         # state='IN_USE'
-        state='AVAILABLE'
-    ), silent=True)
-    wm.add_fact(fact=Fact(
-        fact_title='EQUIPMENT', 
-        equipment_type='CONTAINER', 
-        equipment_name='BOWL',
-        equipment_id=2,
-        state='DIRTY'
+        state='AVAILABLE',
+        volume=4,
+        volume_unit='QUARTS',
     ), silent=True)
 
     # OVEN_STATE = wm.query_equipment_state(
@@ -62,6 +61,14 @@ def main(*, wm, kb, recipe, args):
     equipment_status_rules = get_equipment_status_rules()
     kb.add_rules(rules=equipment_status_rules)
     print(f"Added {len(equipment_status_rules)} equipment status rules")
+
+    ingredient_rules = get_ingredient_rules()
+    kb.add_rules(rules=ingredient_rules)
+    print(f"Added {len(ingredient_rules)} ingredient rules")
+
+    unit_conversion_facts = get_measurement_unit_conversion_facts()
+    kb.add_reference_fact(fact=unit_conversion_facts)
+    print(f"Added {len(unit_conversion_facts)} unit conversion reference facts")
 
     print("*"*70)
     print("⚙️⚙️ RUN PLANNING ENGINE ⚙️⚙️")

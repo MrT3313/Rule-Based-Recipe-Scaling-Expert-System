@@ -29,6 +29,24 @@ class WorkingMemory:
         else:
             return results
     
+    def query_facts(self, *, fact_title, first=False, **attributes):
+        results = []
+
+        for fact in self.facts:
+            if (
+                    fact.fact_title == fact_title and
+                    all(fact.attributes.get(key) == value for key, value in attributes.items())
+            ):
+                if first:
+                    return fact
+                else:
+                    results.append(fact)
+
+        if first:
+            return None
+        else:
+            return results
+
     def query_equipment_state(self, *, equipment_name, equipment_id):
         for fact in self.facts:
             if (

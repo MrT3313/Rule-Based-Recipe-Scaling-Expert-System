@@ -48,9 +48,9 @@ class TestEquipmentResolution:
         success, plan = engine.run(recipe=recipe)
 
         assert success is True
-        assert plan == []
-        # State changed to RESERVED
-        assert wm.facts[0].attributes['state'] == 'RESERVED'
+        assert len(plan) == 1
+        # State changed to IN_USE
+        assert wm.facts[0].attributes['state'] == 'IN_USE'
 
     def test_oven_in_use(self):
         engine, wm, recipe = _make_oven_engine('IN_USE')
@@ -64,11 +64,11 @@ class TestEquipmentResolution:
         success, plan = engine.run(recipe=recipe)
 
         assert success is True
-        assert len(plan) == 1
+        assert len(plan) == 2
         assert isinstance(plan[0], CleaningStep)
         assert plan[0].equipment_name == 'OVEN'
-        # State mutated to RESERVED (cleaned then reserved)
-        assert wm.facts[0].attributes['state'] == 'RESERVED'
+        # State mutated to IN_USE (cleaned, reserved, then in-use)
+        assert wm.facts[0].attributes['state'] == 'IN_USE'
 
 
 def _make_bowl_engine(states):
@@ -110,29 +110,29 @@ class TestMultiEquipmentResolution:
         success, plan = engine.run(recipe=recipe)
 
         assert success is True
-        assert plan == []
-        assert wm.facts[0].attributes['state'] == 'RESERVED'
-        assert wm.facts[1].attributes['state'] == 'RESERVED'
+        assert len(plan) == 1
+        assert wm.facts[0].attributes['state'] == 'IN_USE'
+        assert wm.facts[1].attributes['state'] == 'IN_USE'
 
     def test_two_bowls_one_dirty_one_available(self):
         engine, wm, recipe = _make_bowl_engine(['DIRTY', 'AVAILABLE'])
         success, plan = engine.run(recipe=recipe)
 
         assert success is True
-        assert len(plan) == 1
+        assert len(plan) == 2
         assert isinstance(plan[0], CleaningStep)
-        assert wm.facts[0].attributes['state'] == 'RESERVED'
-        assert wm.facts[1].attributes['state'] == 'RESERVED'
+        assert wm.facts[0].attributes['state'] == 'IN_USE'
+        assert wm.facts[1].attributes['state'] == 'IN_USE'
 
     def test_two_bowls_both_dirty(self):
         engine, wm, recipe = _make_bowl_engine(['DIRTY', 'DIRTY'])
         success, plan = engine.run(recipe=recipe)
 
         assert success is True
-        assert len(plan) == 2
-        assert all(isinstance(s, CleaningStep) for s in plan)
-        assert wm.facts[0].attributes['state'] == 'RESERVED'
-        assert wm.facts[1].attributes['state'] == 'RESERVED'
+        assert len(plan) == 3
+        assert all(isinstance(s, CleaningStep) for s in plan[:2])
+        assert wm.facts[0].attributes['state'] == 'IN_USE'
+        assert wm.facts[1].attributes['state'] == 'IN_USE'
 
     def test_two_bowls_one_in_use(self):
         engine, wm, recipe = _make_bowl_engine(['AVAILABLE', 'IN_USE'])
