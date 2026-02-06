@@ -29,7 +29,8 @@ def main(*, wm, kb, recipe, args):
         equipment_type='CONTAINER', 
         equipment_name='BOWL',
         equipment_id=1,
-        state='IN_USE'
+        # state='IN_USE'
+        state='AVAILABLE'
     ), silent=True)
     wm.add_fact(fact=Fact(
         fact_title='EQUIPMENT', 

@@ -20,6 +20,8 @@ def _clean_equipment(*, bindings, wm, kb, plan):
 
     if dirty_fact:
         dirty_fact.attributes['state'] = 'AVAILABLE'
+        if bindings.get('reserve_after_cleaning'):
+            dirty_fact.attributes['state'] = 'RESERVED'
 
     return bindings
 

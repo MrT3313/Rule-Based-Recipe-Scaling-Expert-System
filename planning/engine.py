@@ -13,11 +13,13 @@ class PlanningEngine:
         for idx, step in enumerate(recipe.steps):
             print(f"Step {idx + 1}: {step.description}")
 
+            # VERIFY: all equipment is available (and reserve it)
             for equipment_need in step.required_equipment:
-                resolved = self._resolve_equipment(equipment_need)
-                if resolved:
-                    if self.verbose:
-                        print(f"  -> Resolved: {resolved}")
+                resolved_list = self._resolve_equipment(equipment_need)
+                if resolved_list is not None:
+                    for eq in resolved_list:
+                        if self.verbose:
+                            print(f"  -> Resolved: {eq}")
                 else:
                     equipment_name = equipment_need.get('equipment_name', equipment_need)
                     if self.verbose:
@@ -27,36 +29,46 @@ class PlanningEngine:
         return (True, self.plan)
 
     def _resolve_equipment(self, equipment_need):
+        """Resolve required_count pieces of equipment, returning a list or None on failure."""
         equipment_name = equipment_need.get('equipment_name')
+        required_count = equipment_need.get('required_count', 1)
+        resolved = []
 
-        # 1. Look for AVAILABLE equipment
-        available = self.working_memory.query_equipment(
-            equipment_name=equipment_name,
-            first=True,
-            state='AVAILABLE',
-        )
-        if available:
-            return available
+        for _ in range(required_count):
+            # 1. Look for AVAILABLE equipment
+            available = self.working_memory.query_equipment(
+                equipment_name=equipment_name,
+                first=True,
+                state='AVAILABLE',
+            )
+            if available:
+                available.attributes['state'] = 'RESERVED'
+                resolved.append(available)
+                continue
 
-        # 2. Look for DIRTY equipment and try to clean it via rules
-        dirty = self.working_memory.query_equipment(
-            equipment_name=equipment_name,
-            first=True,
-            state='DIRTY',
-        )
-        if dirty:
-            matches = self._find_matching_rules(dirty)
-            if matches:
-                best_rule, best_bindings = self._resolve_conflict(matches)
-                derived = self._fire_rule(best_rule, best_bindings)
-                if self.verbose:
-                    print(f"    [Rule fired] {best_rule.rule_name} -> updated Fact #{dirty.fact_id}")
-                    if derived is not None:
-                        print(f"    [Rule fired] {best_rule.rule_name} -> derived {derived}")
+            # 2. Look for DIRTY equipment and try to clean it via rules
+            dirty = self.working_memory.query_equipment(
+                equipment_name=equipment_name,
+                first=True,
+                state='DIRTY',
+            )
+            if dirty:
+                matches = self._find_matching_rules(dirty)
+                if matches:
+                    best_rule, best_bindings = self._resolve_conflict(matches)
+                    best_bindings['reserve_after_cleaning'] = True
+                    derived = self._fire_rule(best_rule, best_bindings)
+                    if self.verbose:
+                        print(f"    [Rule fired] {best_rule.rule_name} -> updated Fact #{dirty.fact_id}")
+                        if derived is not None:
+                            print(f"    [Rule fired] {best_rule.rule_name} -> derived {derived}")
+                    resolved.append(dirty)
+                    continue
 
-                return dirty
+            # Not enough equipment available
+            return None
 
-        return None
+        return resolved
 
     def _find_matching_rules(self, fact):
         """Return all (rule, bindings) pairs whose antecedents match the given fact."""

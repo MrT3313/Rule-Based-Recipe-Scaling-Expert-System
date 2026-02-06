@@ -1,6 +1,7 @@
 from classes.Recipe import Recipe
 from classes.Ingredient import Ingredient
 from planning.classes.PreparationStep import PreheatStep
+from planning.classes.MixingStep import MixingStep
 
 chocolate_chip_cookies_recipe = Recipe(
     name="chocolate_chip_cookies",
@@ -19,6 +20,10 @@ chocolate_chip_cookies_recipe = Recipe(
         {
             'equipment_name': 'OVEN',
             'required_count': 1,
+        },
+        {
+            'equipment_name': 'BOWL',
+            'required_count': 2,
         }
     ],
     steps=[
@@ -32,6 +37,15 @@ chocolate_chip_cookies_recipe = Recipe(
             ],
             temperature=350,
             temperature_unit="fahrenheit",
+        ),
+        MixingStep(
+            description="Mix the ingredients",
+            required_equipment=[
+                {
+                    'equipment_name': 'BOWL',
+                    'required_count': 2,
+                }
+            ],
         )
     ],
 )
