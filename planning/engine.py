@@ -26,6 +26,9 @@ class PlanningEngine:
                         print(f"  -> FAILED to resolve equipment: {equipment_name}")
                     return (False, f"{equipment_name} could not be resolved")
 
+            # APPEND TO PLAN
+            self.plan.append(step)
+
         return (True, self.plan)
 
     def _resolve_equipment(self, equipment_need):
