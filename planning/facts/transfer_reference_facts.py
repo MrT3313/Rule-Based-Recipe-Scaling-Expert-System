@@ -27,4 +27,11 @@ def get_transfer_reference_facts():
         unit='inches',
     ))
 
+    facts.append(Fact(
+        fact_title='oven_rack_dimensions',
+        width=21,
+        length=24,
+        unit='inches',
+    ))
+
     return facts

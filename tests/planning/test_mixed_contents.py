@@ -8,16 +8,20 @@ from classes.WorkingMemory import WorkingMemory
 from planning.classes.MixingStep import MixingStep
 from planning.classes.MixingSubstep import MixingSubstep
 from planning.classes.TransferStep import TransferStep
+from planning.classes.EquipmentTransferStep import EquipmentTransferStep
+from planning.classes.Step import Step
 from planning.engine import PlanningEngine
 from planning.rules.equipment_status import get_equipment_status_rules
 from planning.rules.ingredient_rules import get_ingredient_rules
 from planning.rules.transfer_rules import get_transfer_rules
+from planning.rules.equipment_transfer_rules import get_equipment_transfer_rules
 from scaling.facts.measurement_unit_conversions import get_measurement_unit_conversion_facts
 from planning.facts.transfer_reference_facts import get_transfer_reference_facts
 
 
 def _make_engine(*, ingredients, substeps, bowl_volume=4, bowl_volume_unit='QUARTS',
-                 num_baking_sheets=2, include_transfer=True):
+                 num_baking_sheets=2, include_transfer=True,
+                 num_ovens=0, oven_racks=2, include_equipment_transfer=False):
     """Build a PlanningEngine with a MixingStep and optionally a TransferStep."""
     wm = WorkingMemory()
     wm.add_fact(fact=Fact(
@@ -39,10 +43,24 @@ def _make_engine(*, ingredients, substeps, bowl_volume=4, bowl_volume_unit='QUAR
             state='AVAILABLE',
         ), silent=True)
 
+    for i in range(num_ovens):
+        # First oven starts IN_USE (simulates PreheatStep having already run)
+        state = 'IN_USE' if i == 0 else 'AVAILABLE'
+        wm.add_fact(fact=Fact(
+            fact_title='EQUIPMENT',
+            equipment_type='APPLIANCE',
+            equipment_name='OVEN',
+            equipment_id=i + 1,
+            state=state,
+            number_of_racks=oven_racks,
+        ), silent=True)
+
     kb = KnowledgeBase()
     kb.add_rules(rules=get_equipment_status_rules())
     kb.add_rules(rules=get_ingredient_rules())
     kb.add_rules(rules=get_transfer_rules())
+    if include_equipment_transfer:
+        kb.add_rules(rules=get_equipment_transfer_rules())
     kb.add_reference_fact(fact=get_measurement_unit_conversion_facts())
     kb.add_reference_fact(fact=get_transfer_reference_facts())
 
@@ -62,6 +80,16 @@ def _make_engine(*, ingredients, substeps, bowl_volume=4, bowl_volume_unit='QUAR
                 target_equipment_name='BAKING_SHEET',
                 scoop_size_amount=2,
                 scoop_size_unit='TABLESPOONS',
+                required_equipment=[],
+            ),
+        )
+
+    if include_equipment_transfer:
+        steps.append(
+            EquipmentTransferStep(
+                description='Transfer baking sheets to oven racks',
+                source_equipment_name='BAKING_SHEET',
+                target_equipment_name='OVEN',
                 required_equipment=[],
             ),
         )
@@ -576,3 +604,100 @@ class TestFullRecipeWithTransfer:
 
         # 1 MixingStep + 5 TransferSteps (38 balls / 8 per sheet = 5 sheets)
         assert len(plan) == 6
+
+
+# ---------------------------------------------------------------------------
+# Equipment transfer (baking sheets → oven racks) with preheat waits
+# ---------------------------------------------------------------------------
+
+class TestEquipmentTransferPlanLength:
+    """Verify plan includes preheat wait steps for all ovens (including on-demand ones)."""
+
+    def _cookie_ingredients_and_substeps(self):
+        """Full cookie recipe: produces 38 dough balls → 5 sheets needed."""
+        ingredients = [
+            Ingredient(id=1, name='all-purpose flour', amount=2.25, unit='cups', measurement_category='VOLUME'),
+            Ingredient(id=2, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+            Ingredient(id=3, name='white sugar', amount=0.75, unit='cups', measurement_category='VOLUME'),
+            Ingredient(id=4, name='brown sugar', amount=0.75, unit='cups', measurement_category='VOLUME'),
+            Ingredient(id=5, name='eggs', amount=2, unit='whole', measurement_category='WHOLE'),
+            Ingredient(id=6, name='vanilla extract', amount=2, unit='teaspoons', measurement_category='LIQUID'),
+            Ingredient(id=7, name='baking soda', amount=1, unit='teaspoons', measurement_category='VOLUME'),
+            Ingredient(id=8, name='salt', amount=1, unit='teaspoons', measurement_category='VOLUME'),
+        ]
+        substeps = [
+            MixingSubstep(ingredient_ids=[2, 3, 4], description='Cream butter and sugars'),
+            MixingSubstep(ingredient_ids=[5, 6], description='Beat in eggs and vanilla'),
+            MixingSubstep(ingredient_ids=[1, 7, 8], description='Mix in flour, baking soda, salt'),
+        ]
+        return ingredients, substeps
+
+    def test_five_sheets_three_ovens(self):
+        """5 sheets, 3 ovens (2 racks each) → 3 preheat waits + 5 rack placements."""
+        ingredients, substeps = self._cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_equipment_transfer=True,
+        )
+        success, plan = engine.run(recipe=recipe)
+
+        assert success is True
+
+        # 1 MixingStep + 5 TransferSteps + 3 preheat waits + 5 EquipmentTransferSteps = 14
+        assert len(plan) == 14
+
+        preheat_steps = [s for s in plan if s.description.startswith('Wait for OVEN')]
+        assert len(preheat_steps) == 3
+        assert 'OVEN #1' in preheat_steps[0].description
+        assert 'OVEN #2' in preheat_steps[1].description
+        assert 'OVEN #3' in preheat_steps[2].description
+
+        equip_transfer_steps = [s for s in plan if isinstance(s, EquipmentTransferStep)]
+        assert len(equip_transfer_steps) == 5
+
+    def test_two_sheets_one_oven(self):
+        """2 sheets (small recipe), 1 oven (2 racks) → 1 preheat wait + 2 rack placements."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [
+            MixingSubstep(ingredient_ids=[1], description='Mix butter'),
+        ]
+        # 1 cup butter = 48 tsp / 6 tsp per scoop = 8 dough balls / 8 per sheet = 1 sheet
+        # Need more: 2 cups → 96 tsp / 6 = 16 balls / 8 = 2 sheets
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=2, unit='cups', measurement_category='VOLUME'),
+        ]
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=2, num_ovens=1, oven_racks=2,
+            include_equipment_transfer=True,
+        )
+        success, plan = engine.run(recipe=recipe)
+
+        assert success is True
+
+        # 1 MixingStep + 2 TransferSteps + 1 preheat wait + 2 EquipmentTransferSteps = 6
+        assert len(plan) == 6
+
+        preheat_steps = [s for s in plan if s.description.startswith('Wait for OVEN')]
+        assert len(preheat_steps) == 1
+
+        equip_transfer_steps = [s for s in plan if isinstance(s, EquipmentTransferStep)]
+        assert len(equip_transfer_steps) == 2
+
+    def test_not_enough_ovens_fails(self):
+        """5 sheets but only 2 ovens (4 rack slots) → should fail."""
+        ingredients, substeps = self._cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=2, oven_racks=2,
+            include_equipment_transfer=True,
+        )
+        success, result = engine.run(recipe=recipe)
+
+        assert success is False

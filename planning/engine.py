@@ -1,6 +1,8 @@
 from classes.Fact import Fact
 from planning.classes.MixingStep import MixingStep
 from planning.classes.TransferStep import TransferStep
+from planning.classes.EquipmentTransferStep import EquipmentTransferStep
+from planning.classes.Step import Step
 
 
 class PlanningEngine:
@@ -33,6 +35,13 @@ class PlanningEngine:
             # TransferStep handles its own equipment resolution iteratively
             if isinstance(step, TransferStep):
                 success, error = self._execute_transfer_step(step, recipe)
+                if not success:
+                    return (False, error)
+                continue
+
+            # EquipmentTransferStep: equipment-to-equipment transfers (e.g., sheet → oven)
+            if isinstance(step, EquipmentTransferStep):
+                success, error = self._execute_equipment_transfer_step(step, recipe)
                 if not success:
                     return (False, error)
                 continue
@@ -260,6 +269,203 @@ class PlanningEngine:
                 source_eq.attributes['state'] = 'DIRTY'
                 if self.verbose:
                     print(f"\n  -> {step.source_equipment_name} #{source_equipment_id} is now DIRTY")
+
+        return (True, None)
+
+    def _execute_equipment_transfer_step(self, step, recipe):
+        """Execute an EquipmentTransferStep: discover sources, preheat wait, plan, then loop per rack."""
+        # Phase 0 — Discover source equipment (IN_USE sheets with DOUGH_BALLS contents)
+        source_contents = self.working_memory.query_facts(
+            fact_title='equipment_contents',
+            equipment_name=step.source_equipment_name,
+            content_type='DOUGH_BALLS',
+        )
+        if not source_contents:
+            return (False, f"No {step.source_equipment_name} found with DOUGH_BALLS contents")
+
+        # Collect unique source equipment IDs
+        source_ids = []
+        for content in source_contents:
+            sid = content.attributes['equipment_id']
+            if sid not in source_ids:
+                source_ids.append(sid)
+
+        if self.verbose:
+            print(f"\n  Found {len(source_ids)} {step.source_equipment_name}(s) with dough balls: {source_ids}")
+
+        # Phase 1 — Preheat wait: assert preheat_check_request → fire rule
+        preheat_request = Fact(
+            fact_title='preheat_check_request',
+            target_equipment_name=step.target_equipment_name,
+        )
+        self.working_memory.add_fact(fact=preheat_request, indent="  ")
+
+        matches = self._find_matching_rules(preheat_request)
+        if not matches:
+            return (False, "No rule matched for preheat_check_request")
+
+        best_rule, best_bindings = self._resolve_conflict(matches)
+        derived = self._fire_rule(best_rule, best_bindings)
+
+        if '?error' in best_bindings:
+            return (False, best_bindings['?error'])
+
+        if self.verbose:
+            print(f"  [Rule fired] {best_rule.rule_name}")
+            if derived is not None:
+                print(f"  [Derived] {derived}")
+
+        # Phase 2 — Plan: assert equipment_transfer_planning_request → fire rule
+        planning_request = Fact(
+            fact_title='equipment_transfer_planning_request',
+            source_equipment_name=step.source_equipment_name,
+            target_equipment_name=step.target_equipment_name,
+            num_source_items=len(source_ids),
+        )
+        self.working_memory.add_fact(fact=planning_request, indent="  ")
+
+        matches = self._find_matching_rules(planning_request)
+        if not matches:
+            return (False, "No rule matched for equipment_transfer_planning_request")
+
+        best_rule, best_bindings = self._resolve_conflict(matches)
+        derived = self._fire_rule(best_rule, best_bindings)
+
+        if '?error' in best_bindings:
+            return (False, best_bindings['?error'])
+
+        if self.verbose:
+            print(f"  [Rule fired] {best_rule.rule_name}")
+            if derived is not None:
+                print(f"  [Derived] {derived}")
+
+        # Read equipment_transfer_plan from WM
+        transfer_plan = self.working_memory.query_facts(
+            fact_title='equipment_transfer_plan',
+            first=True,
+        )
+        if transfer_plan is None:
+            return (False, "equipment_transfer_plan fact not found after planning rule")
+
+        items_per_rack = transfer_plan.attributes['items_per_rack']
+        capacity_per_target = transfer_plan.attributes['capacity_per_target']
+        num_targets_needed = transfer_plan.attributes['num_targets_needed']
+
+        if self.verbose:
+            print(f"\n  Transfer plan: {len(source_ids)} sheets, {items_per_rack}/rack, "
+                  f"{capacity_per_target}/oven, {num_targets_needed} oven(s) needed")
+
+        # Phase 3 — Demand-driven loop: ask rule system for available racks, resolve new ovens on-demand
+        remaining_sources = list(source_ids)
+
+        while remaining_sources:
+            # Step A — Ask rule system: "Is there an available rack?"
+            rack_request = Fact(
+                fact_title='available_rack_request',
+                target_equipment_name=step.target_equipment_name,
+            )
+            self.working_memory.add_fact(fact=rack_request, indent="    ")
+
+            matches = self._find_matching_rules(rack_request)
+            if not matches:
+                return (False, "No rule matched for available_rack_request")
+
+            best_rule, best_bindings = self._resolve_conflict(matches)
+            derived = self._fire_rule(best_rule, best_bindings)
+
+            if self.verbose:
+                print(f"    [Rule fired] {best_rule.rule_name}")
+                if derived is not None:
+                    print(f"    [Derived] {derived}")
+
+            rack_found = best_bindings.get('?rack_found', False)
+
+            # Step B — If no rack found, resolve a new oven and transition to IN_USE
+            if not rack_found:
+                equipment_need = {'equipment_name': step.target_equipment_name, 'required_count': 1}
+                resolved_list = self._resolve_equipment(equipment_need)
+                if resolved_list is None:
+                    return (False, f"Could not resolve additional {step.target_equipment_name}")
+
+                new_oven = resolved_list[0]
+                new_oven.attributes['state'] = 'IN_USE'
+                new_oven_id = new_oven.attributes['equipment_id']
+
+                # Add preheat wait step to plan (same as Phase 1 does for oven #1)
+                self.plan.append(Step(
+                    description=f"Wait for {step.target_equipment_name} #{new_oven_id} to preheat",
+                ))
+
+                if self.verbose:
+                    print(f"\n  -> Resolved and preheated {step.target_equipment_name} #{new_oven_id}")
+
+                # Re-ask the rule system now that a new oven is IN_USE
+                rack_request2 = Fact(
+                    fact_title='available_rack_request',
+                    target_equipment_name=step.target_equipment_name,
+                )
+                self.working_memory.add_fact(fact=rack_request2, indent="    ")
+
+                matches2 = self._find_matching_rules(rack_request2)
+                if not matches2:
+                    return (False, "No rule matched for available_rack_request after resolving new equipment")
+
+                best_rule2, best_bindings2 = self._resolve_conflict(matches2)
+                derived2 = self._fire_rule(best_rule2, best_bindings2)
+
+                if self.verbose:
+                    print(f"    [Rule fired] {best_rule2.rule_name}")
+                    if derived2 is not None:
+                        print(f"    [Derived] {derived2}")
+
+                rack_found = best_bindings2.get('?rack_found', False)
+                if not rack_found:
+                    return (False, f"Still no available rack after resolving {step.target_equipment_name}")
+
+                # Use the re-derived bindings
+                best_bindings = best_bindings2
+
+            oven_id = best_bindings['?equipment_id']
+            rack_num = best_bindings['?rack_number']
+            source_id = remaining_sources.pop(0)
+
+            if self.verbose:
+                print(f"\n  {step.target_equipment_name} #{oven_id}, Rack {rack_num}: "
+                      f"placing {step.source_equipment_name} #{source_id}")
+
+            # Step C — Assert equipment_transfer_request → fire execute_equipment_transfer rule
+            transfer_request = Fact(
+                fact_title='equipment_transfer_request',
+                target_equipment_name=step.target_equipment_name,
+                target_equipment_id=oven_id,
+                slot_number=rack_num,
+                source_equipment_name=step.source_equipment_name,
+                source_equipment_id=source_id,
+            )
+            self.working_memory.add_fact(fact=transfer_request, indent="    ")
+
+            matches = self._find_matching_rules(transfer_request)
+            if not matches:
+                return (False, f"No rule matched for equipment_transfer_request on rack {rack_num}")
+
+            best_rule, best_bindings = self._resolve_conflict(matches)
+            derived = self._fire_rule(best_rule, best_bindings)
+
+            if '?error' in best_bindings:
+                return (False, best_bindings['?error'])
+
+            if self.verbose:
+                print(f"    [Rule fired] {best_rule.rule_name}")
+                if derived is not None:
+                    print(f"    [Derived] {derived}")
+
+            # Append per-rack EquipmentTransferStep to plan
+            rack_step = EquipmentTransferStep(
+                description=f"Place {step.source_equipment_name} #{source_id} on {step.target_equipment_name} #{oven_id} rack {rack_num}",
+                source_equipment_name=step.source_equipment_name,
+                target_equipment_name=step.target_equipment_name,
+            )
+            self.plan.append(rack_step)
 
         return (True, None)
 
