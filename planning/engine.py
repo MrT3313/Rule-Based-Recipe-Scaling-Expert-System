@@ -95,7 +95,7 @@ class PlanningEngine:
                         matches = self._find_matching_rules(trigger)
                         if matches:
                             best_rule, best_bindings = self._resolve_conflict(matches)
-                            derived = self._fire_rule(best_rule, best_bindings)
+                            derived = self._fire_rules_dfs(best_rule, best_bindings)
                             if self.verbose:
                                 print(f"  [Rule fired] {best_rule.rule_name}")
                                 if derived is not None:
@@ -155,7 +155,7 @@ class PlanningEngine:
                     return (False, f"No rule matched for ingredient {ingredient.ingredient_name}")
 
                 best_rule, best_bindings = self._resolve_conflict(matches)
-                derived = self._fire_rule(best_rule, best_bindings)
+                derived = self._fire_rules_dfs(best_rule, best_bindings)
 
                 if self.verbose:
                     print(f"    [Rule fired] {best_rule.rule_name}")
@@ -201,7 +201,7 @@ class PlanningEngine:
                 return (False, "No rule matched for transfer_planning_request")
 
             best_rule, best_bindings = self._resolve_conflict(matches)
-            derived = self._fire_rule(best_rule, best_bindings)
+            derived = self._fire_rules_dfs(best_rule, best_bindings)
 
             if '?error' in best_bindings:
                 return (False, best_bindings['?error'])
@@ -261,7 +261,7 @@ class PlanningEngine:
                     return (False, f"No rule matched for transfer_request on sheet {sheet_idx + 1}")
 
                 best_rule, best_bindings = self._resolve_conflict(matches)
-                derived = self._fire_rule(best_rule, best_bindings)
+                derived = self._fire_rules_dfs(best_rule, best_bindings)
 
                 if '?error' in best_bindings:
                     return (False, best_bindings['?error'])
@@ -329,7 +329,7 @@ class PlanningEngine:
             return (False, "No rule matched for preheat_check_request")
 
         best_rule, best_bindings = self._resolve_conflict(matches)
-        derived = self._fire_rule(best_rule, best_bindings)
+        derived = self._fire_rules_dfs(best_rule, best_bindings)
 
         if '?error' in best_bindings:
             return (False, best_bindings['?error'])
@@ -353,7 +353,7 @@ class PlanningEngine:
             return (False, "No rule matched for equipment_transfer_planning_request")
 
         best_rule, best_bindings = self._resolve_conflict(matches)
-        derived = self._fire_rule(best_rule, best_bindings)
+        derived = self._fire_rules_dfs(best_rule, best_bindings)
 
         if '?error' in best_bindings:
             return (False, best_bindings['?error'])
@@ -395,7 +395,7 @@ class PlanningEngine:
                 return (False, "No rule matched for available_rack_request")
 
             best_rule, best_bindings = self._resolve_conflict(matches)
-            derived = self._fire_rule(best_rule, best_bindings)
+            derived = self._fire_rules_dfs(best_rule, best_bindings)
 
             if self.verbose:
                 print(f"    [Rule fired] {best_rule.rule_name}")
@@ -437,7 +437,7 @@ class PlanningEngine:
                     return (False, "No rule matched for available_rack_request after resolving new equipment")
 
                 best_rule2, best_bindings2 = self._resolve_conflict(matches2)
-                derived2 = self._fire_rule(best_rule2, best_bindings2)
+                derived2 = self._fire_rules_dfs(best_rule2, best_bindings2)
 
                 if self.verbose:
                     print(f"    [Rule fired] {best_rule2.rule_name}")
@@ -475,7 +475,7 @@ class PlanningEngine:
                 return (False, f"No rule matched for equipment_transfer_request on rack {rack_num}")
 
             best_rule, best_bindings = self._resolve_conflict(matches)
-            derived = self._fire_rule(best_rule, best_bindings)
+            derived = self._fire_rules_dfs(best_rule, best_bindings)
 
             if '?error' in best_bindings:
                 return (False, best_bindings['?error'])
@@ -569,7 +569,7 @@ class PlanningEngine:
                 return (False, "No IN_USE oven found for preheat")
 
         oven_substeps[current_oven_id] = []
-        derived = self._fire_rule(best_rule, best_bindings, plan_override=oven_substeps[current_oven_id])
+        derived = self._fire_rules_dfs(best_rule, best_bindings, plan_override=oven_substeps[current_oven_id])
 
         if '?error' in best_bindings:
             return (False, best_bindings['?error'])
@@ -593,7 +593,7 @@ class PlanningEngine:
             return (False, "No rule matched for equipment_transfer_planning_request")
 
         best_rule, best_bindings = self._resolve_conflict(matches)
-        derived = self._fire_rule(best_rule, best_bindings)
+        derived = self._fire_rules_dfs(best_rule, best_bindings)
 
         if '?error' in best_bindings:
             return (False, best_bindings['?error'])
@@ -636,7 +636,7 @@ class PlanningEngine:
                 return (False, "No rule matched for available_rack_request")
 
             best_rule, best_bindings = self._resolve_conflict(matches)
-            derived = self._fire_rule(best_rule, best_bindings)
+            derived = self._fire_rules_dfs(best_rule, best_bindings)
 
             if self.verbose:
                 print(f"    [Rule fired] {best_rule.rule_name}")
@@ -701,7 +701,7 @@ class PlanningEngine:
                     return (False, "No rule matched for available_rack_request after resolving new equipment")
 
                 best_rule2, best_bindings2 = self._resolve_conflict(matches2)
-                derived2 = self._fire_rule(best_rule2, best_bindings2)
+                derived2 = self._fire_rules_dfs(best_rule2, best_bindings2)
 
                 if self.verbose:
                     print(f"    [Rule fired] {best_rule2.rule_name}")
@@ -738,7 +738,7 @@ class PlanningEngine:
                 return (False, f"No rule matched for equipment_transfer_request on rack {rack_num}")
 
             best_rule, best_bindings = self._resolve_conflict(matches)
-            derived = self._fire_rule(best_rule, best_bindings)
+            derived = self._fire_rules_dfs(best_rule, best_bindings)
 
             if '?error' in best_bindings:
                 return (False, best_bindings['?error'])
@@ -888,7 +888,7 @@ class PlanningEngine:
                     return (False, f"No rule matched for equipment_removal_request")
 
                 best_rule, best_bindings = self._resolve_conflict(matches)
-                derived = self._fire_rule(best_rule, best_bindings)
+                derived = self._fire_rules_dfs(best_rule, best_bindings)
 
                 if '?error' in best_bindings:
                     return (False, best_bindings['?error'])
@@ -958,7 +958,7 @@ class PlanningEngine:
                     return (False, f"No rule matched for item_transfer_request")
 
                 best_rule, best_bindings = self._resolve_conflict(matches)
-                derived = self._fire_rule(best_rule, best_bindings)
+                derived = self._fire_rules_dfs(best_rule, best_bindings)
 
                 if '?error' in best_bindings:
                     return (False, best_bindings['?error'])
@@ -1004,7 +1004,7 @@ class PlanningEngine:
         matches = self._find_matching_rules(cooking_request)
         if matches:
             best_rule, best_bindings = self._resolve_conflict(matches)
-            derived = self._fire_rule(best_rule, best_bindings, plan_override=substeps_list)
+            derived = self._fire_rules_dfs(best_rule, best_bindings, plan_override=substeps_list)
 
             if self.verbose:
                 print(f"    [Rule fired] {best_rule.rule_name}")
@@ -1040,7 +1040,7 @@ class PlanningEngine:
                 if matches:
                     best_rule, best_bindings = self._resolve_conflict(matches)
                     best_bindings['reserve_after_cleaning'] = True
-                    derived = self._fire_rule(best_rule, best_bindings)
+                    derived = self._fire_rules_dfs(best_rule, best_bindings)
                     if self.verbose:
                         print(f"    [Rule fired] {best_rule.rule_name} -> updated Fact #{dirty.fact_id}")
                         if derived is not None:
@@ -1110,7 +1110,7 @@ class PlanningEngine:
                 new_attrs[key] = value
         return Fact(fact_title=fact_template.fact_title, **new_attrs)
 
-    def _fire_rule(self, rule, bindings, plan_override=None):
+    def _fire_rules_dfs(self, rule, bindings, plan_override=None):
         """Fire a rule: run action_fn if present, then derive consequent if present.
         DFS: if the derived fact triggers further rules, fire them recursively."""
         if rule.action_fn:
@@ -1129,7 +1129,7 @@ class PlanningEngine:
             chain_matches = self._find_matching_rules(derived)
             if chain_matches:
                 best_chain_rule, best_chain_bindings = self._resolve_conflict(chain_matches)
-                self._fire_rule(best_chain_rule, best_chain_bindings, plan_override=plan_override)
+                self._fire_rules_dfs(best_chain_rule, best_chain_bindings, plan_override=plan_override)
 
             return derived
 
