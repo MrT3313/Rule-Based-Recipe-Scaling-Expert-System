@@ -1,7 +1,7 @@
 import math
 from classes.Rule import Rule
 from classes.Fact import Fact
-from planning.classes.Step import Step
+from planning.classes.WaitStep import WaitStep
 
 
 def _check_oven_preheated(*, bindings, wm, kb, plan):
@@ -21,8 +21,10 @@ def _check_oven_preheated(*, bindings, wm, kb, plan):
     oven_id = oven.attributes['equipment_id']
 
     # Add a wait step to the plan
-    plan.append(Step(
+    plan.append(WaitStep(
         description=f"Wait for {target_equipment_name} #{oven_id} to preheat",
+        equipment_name=target_equipment_name,
+        equipment_id=oven_id,
     ))
 
     bindings['?equipment_id'] = oven_id

@@ -11,7 +11,6 @@ from planning.classes.TransferItem import TransferItem
 from planning.classes.TransferEquipment import TransferEquipment
 from planning.classes.CookStep import CookStep
 from planning.classes.WaitStep import WaitStep
-from planning.classes.Step import Step
 from planning.engine import PlanningEngine
 from planning.rules.equipment_status import get_equipment_status_rules
 from planning.rules.ingredient_rules import get_ingredient_rules
@@ -166,13 +165,13 @@ class TestCookStepPlanLength:
 
         # Total across all CookSteps
         all_substeps = [s for cs in cook_steps for s in cs.substeps]
-        wait_steps = [s for s in all_substeps if isinstance(s, WaitStep)]
-        assert len(wait_steps) == 3
+        cooking_waits = [s for s in all_substeps if isinstance(s, WaitStep) and s.duration is not None]
+        assert len(cooking_waits) == 3
 
         equip_transfer_steps = [s for s in all_substeps if isinstance(s, TransferEquipment)]
         assert len(equip_transfer_steps) == 5
 
-        preheat_steps = [s for s in all_substeps if s.description.startswith('Wait for OVEN') and s.description.endswith('to preheat')]
+        preheat_steps = [s for s in all_substeps if isinstance(s, WaitStep) and 'preheat' in s.description]
         assert len(preheat_steps) == 3
 
     def test_cook_step_plan_length_two_sheets_one_oven(self):
@@ -200,8 +199,8 @@ class TestCookStepPlanLength:
         cook_step = plan[-1]
         assert len(cook_step.substeps) == 4
 
-        wait_steps = [s for s in cook_step.substeps if isinstance(s, WaitStep)]
-        assert len(wait_steps) == 1
+        cooking_waits = [s for s in cook_step.substeps if isinstance(s, WaitStep) and s.duration is not None]
+        assert len(cooking_waits) == 1
 
         equip_transfer_steps = [s for s in cook_step.substeps if isinstance(s, TransferEquipment)]
         assert len(equip_transfer_steps) == 2
@@ -224,10 +223,10 @@ class TestWaitStepAttributes:
         cook_steps = [s for s in plan if isinstance(s, CookStep)]
         assert len(cook_steps) == 3
 
-        wait_steps = [s for cs in cook_steps for s in cs.substeps if isinstance(s, WaitStep)]
-        assert len(wait_steps) == 3
+        cooking_waits = [s for cs in cook_steps for s in cs.substeps if isinstance(s, WaitStep) and s.duration is not None]
+        assert len(cooking_waits) == 3
 
-        for ws in wait_steps:
+        for ws in cooking_waits:
             assert ws.duration == 12
             assert ws.duration_unit == 'minutes'
             assert ws.is_passive is True
@@ -257,8 +256,8 @@ class TestWaitStepAttributes:
         cook_step = plan[-1]
         assert len(cook_step.substeps) == 3
 
-        wait_steps = [s for s in cook_step.substeps if isinstance(s, WaitStep)]
-        assert len(wait_steps) == 1
+        cooking_waits = [s for s in cook_step.substeps if isinstance(s, WaitStep) and s.duration is not None]
+        assert len(cooking_waits) == 1
 
 
 class TestCookingStartedFact:

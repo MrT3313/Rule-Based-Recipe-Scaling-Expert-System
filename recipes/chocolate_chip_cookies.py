@@ -1,6 +1,6 @@
 from classes.Recipe import Recipe
 from classes.Ingredient import Ingredient
-from planning.classes.PreparationStep import PreheatStep
+from planning.classes.PreheatStep import PreheatStep
 from planning.classes.MixingStep import MixingStep
 from planning.classes.MixingSubstep import MixingSubstep
 from planning.classes.TransferEquipment import TransferEquipment

@@ -5,7 +5,6 @@ from planning.classes.TransferEquipment import TransferEquipment
 from planning.classes.TransferItem import TransferItem
 from planning.classes.CookStep import CookStep
 from planning.classes.WaitStep import WaitStep
-from planning.classes.Step import Step
 
 
 class PlanningEngine:
@@ -417,8 +416,10 @@ class PlanningEngine:
                 new_oven_id = new_oven.attributes['equipment_id']
 
                 # Add preheat wait step to plan (same as Phase 1 does for oven #1)
-                self.plan.append(Step(
+                self.plan.append(WaitStep(
                     description=f"Wait for {step.target_equipment_name} #{new_oven_id} to preheat",
+                    equipment_name=step.target_equipment_name,
+                    equipment_id=new_oven_id,
                 ))
 
                 if self.verbose:
@@ -678,8 +679,10 @@ class PlanningEngine:
 
                 # Initialize substeps for the new oven with preheat wait
                 oven_substeps[new_oven_id] = []
-                oven_substeps[new_oven_id].append(Step(
+                oven_substeps[new_oven_id].append(WaitStep(
                     description=f"Wait for {target_equipment_name} #{new_oven_id} to preheat",
+                    equipment_name=target_equipment_name,
+                    equipment_id=new_oven_id,
                 ))
                 current_oven_id = new_oven_id
 
@@ -841,8 +844,12 @@ class PlanningEngine:
 
             # Add a wait step (once per source)
             if source_eq_id not in sources_waited:
-                self.plan.append(Step(
+                self.plan.append(WaitStep(
                     description=f"Wait for {source_equipment_name} #{source_eq_id} cooking to complete",
+                    equipment_name=source_equipment_name,
+                    equipment_id=source_eq_id,
+                    duration=duration,
+                    duration_unit=duration_unit,
                 ))
                 sources_waited.add(source_eq_id)
 
