@@ -419,3 +419,136 @@ class TestFullRecipeSubsteps:
         assert 'capacity_exceeded' in error
         # Butter (0.25) + white sugar (0.1875) = 0.4375; brown sugar (0.1875) overflows 0.5
         assert 'BROWN_SUGAR' in error
+
+
+# ---------------------------------------------------------------------------
+# Intermediate fact derivation for mixing dispatch rules
+# ---------------------------------------------------------------------------
+
+class TestMixingDispatchIntermediateFacts:
+    def test_mixing_initialized_fact_asserted(self):
+        """mixing_initialized has correct step_idx, equipment_name, equipment_id, volume, volume_unit."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Add butter')]
+
+        engine, wm, recipe = _make_engine(ingredients=ingredients, substeps=substeps)
+        success, _ = engine.run(recipe=recipe)
+
+        assert success is True
+        mi = wm.query_facts(fact_title='mixing_initialized')
+        assert len(mi) == 1
+        assert mi[0].attributes['step_idx'] == 0
+        assert mi[0].attributes['equipment_name'] == 'BOWL'
+        assert mi[0].attributes['equipment_id'] == 1
+        assert mi[0].attributes['equipment_volume'] == 4
+        assert mi[0].attributes['equipment_volume_unit'] == 'QUARTS'
+
+    def test_pending_ingredient_facts_count(self):
+        """N pending_ingredient facts = N ingredients."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+            Ingredient(id=2, name='sugar', amount=0.75, unit='cups', measurement_category='VOLUME'),
+            Ingredient(id=3, name='eggs', amount=2, unit='whole', measurement_category='WHOLE'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1, 2, 3], description='Add all')]
+
+        engine, wm, recipe = _make_engine(ingredients=ingredients, substeps=substeps)
+        engine.run(recipe=recipe)
+
+        pi = wm.query_facts(fact_title='pending_ingredient')
+        assert len(pi) == 3
+
+    def test_pending_ingredient_facts_across_substeps(self):
+        """Sequential seq values across substeps."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+            Ingredient(id=2, name='flour', amount=2, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [
+            MixingSubstep(ingredient_ids=[1], description='Cream'),
+            MixingSubstep(ingredient_ids=[2], description='Add flour'),
+        ]
+
+        engine, wm, recipe = _make_engine(ingredients=ingredients, substeps=substeps)
+        engine.run(recipe=recipe)
+
+        pi = wm.query_facts(fact_title='pending_ingredient')
+        seqs = sorted(p.attributes['seq'] for p in pi)
+        assert seqs == [0, 1]
+
+    def test_ingredient_addition_request_derived(self):
+        """1 ingredient_addition_request per ingredient with correct equipment bindings."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Add butter')]
+
+        engine, wm, recipe = _make_engine(ingredients=ingredients, substeps=substeps)
+        engine.run(recipe=recipe)
+
+        iar = wm.query_facts(fact_title='ingredient_addition_request')
+        assert len(iar) == 1
+        assert iar[0].attributes['equipment_name'] == 'BOWL'
+        assert iar[0].attributes['equipment_id'] == 1
+        assert iar[0].attributes['ingredient_name'] == 'BUTTER'
+
+    def test_ingredient_processed_facts_match_count(self):
+        """N ingredient_processed facts = N ingredients."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+            Ingredient(id=2, name='sugar', amount=0.75, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1, 2], description='Cream')]
+
+        engine, wm, recipe = _make_engine(ingredients=ingredients, substeps=substeps)
+        engine.run(recipe=recipe)
+
+        ip = wm.query_facts(fact_title='ingredient_processed')
+        assert len(ip) == 2
+
+    def test_mixing_completed_fact_asserted(self):
+        """1 mixing_completed fact with correct equipment_name/id."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Add butter')]
+
+        engine, wm, recipe = _make_engine(ingredients=ingredients, substeps=substeps)
+        engine.run(recipe=recipe)
+
+        mc = wm.query_facts(fact_title='mixing_completed')
+        assert len(mc) == 1
+        assert mc[0].attributes['equipment_name'] == 'BOWL'
+        assert mc[0].attributes['equipment_id'] == 1
+
+    def test_no_mixing_completed_on_capacity_failure(self):
+        """mixing_initialized exists but mixing_completed does not when capacity exceeded."""
+        ingredients = [
+            Ingredient(id=1, name='flour', amount=20, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Add flour')]
+
+        engine, wm, recipe = _make_engine(bowl_volume=0.5, ingredients=ingredients, substeps=substeps)
+        success, _ = engine.run(recipe=recipe)
+
+        assert success is False
+        mi = wm.query_facts(fact_title='mixing_initialized')
+        assert len(mi) == 1
+        mc = wm.query_facts(fact_title='mixing_completed')
+        assert len(mc) == 0
+
+    def test_step_request_has_mixing_type(self):
+        """step_request(step_type='MIXING') exists after MixingStep dispatch."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Add butter')]
+
+        engine, wm, recipe = _make_engine(ingredients=ingredients, substeps=substeps)
+        engine.run(recipe=recipe)
+
+        sr = wm.query_facts(fact_title='step_request', step_type='MIXING')
+        assert len(sr) == 1
+        assert sr[0].attributes['step_idx'] == 0

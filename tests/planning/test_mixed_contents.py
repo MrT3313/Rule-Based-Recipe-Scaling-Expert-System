@@ -728,3 +728,233 @@ class TestEquipmentTransferPlanLength:
         success, result = engine.run(recipe=recipe)
 
         assert success is False
+
+
+# ---------------------------------------------------------------------------
+# Transfer dispatch intermediate facts
+# ---------------------------------------------------------------------------
+
+class TestTransferDispatchIntermediateFacts:
+    def test_transfer_source_started_fact(self):
+        """1 transfer_source_started with step_idx, source_name, source_id."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Add butter')]
+
+        engine, wm, recipe = _make_engine(ingredients=ingredients, substeps=substeps, num_baking_sheets=5)
+        success, _ = engine.run(recipe=recipe)
+        assert success is True
+
+        tss = wm.query_facts(fact_title='transfer_source_started')
+        assert len(tss) == 1
+        assert tss[0].attributes['step_idx'] == 1
+        assert tss[0].attributes['source_equipment_name'] == 'BOWL'
+        assert tss[0].attributes['source_equipment_id'] == 1
+
+    def test_transfer_step_info_fact(self):
+        """transfer_step_info has scoop_size_amount, scoop_size_unit, target_equipment_name."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Add butter')]
+
+        engine, wm, recipe = _make_engine(ingredients=ingredients, substeps=substeps, num_baking_sheets=5)
+        engine.run(recipe=recipe)
+
+        tsi = wm.query_facts(fact_title='transfer_step_info', first=True)
+        assert tsi is not None
+        assert tsi.attributes['scoop_size_amount'] == 2
+        assert tsi.attributes['scoop_size_unit'] == 'TABLESPOONS'
+        assert tsi.attributes['target_equipment_name'] == 'BAKING_SHEET'
+
+    def test_transfer_planning_request_fact(self):
+        """transfer_planning_request exists with correct attributes."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Add butter')]
+
+        engine, wm, recipe = _make_engine(ingredients=ingredients, substeps=substeps, num_baking_sheets=5)
+        engine.run(recipe=recipe)
+
+        tpr = wm.query_facts(fact_title='transfer_planning_request', first=True)
+        assert tpr is not None
+        assert tpr.attributes['source_equipment_name'] == 'BOWL'
+        assert tpr.attributes['target_equipment_name'] == 'BAKING_SHEET'
+
+    def test_all_sheets_transferred_fact(self):
+        """1 all_sheets_transferred per source."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Add butter')]
+
+        engine, wm, recipe = _make_engine(ingredients=ingredients, substeps=substeps, num_baking_sheets=5)
+        engine.run(recipe=recipe)
+
+        ast = wm.query_facts(fact_title='all_sheets_transferred')
+        assert len(ast) == 1
+        assert ast[0].attributes['source_equipment_id'] == 1
+
+    def test_transfer_source_processed_fact(self):
+        """1 transfer_source_processed per source."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Add butter')]
+
+        engine, wm, recipe = _make_engine(ingredients=ingredients, substeps=substeps, num_baking_sheets=5)
+        engine.run(recipe=recipe)
+
+        tsp = wm.query_facts(fact_title='transfer_source_processed')
+        assert len(tsp) == 1
+
+    def test_two_bowls_two_transfer_source_started(self):
+        """Two bowls produce 2 transfer_source_started facts with different source_ids."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+            Ingredient(id=2, name='flour', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+
+        engine, wm, recipe = _make_two_bowl_engine(
+            ingredients=ingredients,
+            substeps_bowl1=[MixingSubstep(ingredient_ids=[1], description='Bowl 1')],
+            substeps_bowl2=[MixingSubstep(ingredient_ids=[2], description='Bowl 2')],
+        )
+        success, _ = engine.run(recipe=recipe)
+        assert success is True
+
+        tss = wm.query_facts(fact_title='transfer_source_started')
+        assert len(tss) == 2
+        source_ids = {f.attributes['source_equipment_id'] for f in tss}
+        assert source_ids == {1, 2}
+
+    def test_two_bowls_two_transfer_source_processed(self):
+        """Two bowls produce 2 transfer_source_processed facts."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+            Ingredient(id=2, name='flour', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+
+        engine, wm, recipe = _make_two_bowl_engine(
+            ingredients=ingredients,
+            substeps_bowl1=[MixingSubstep(ingredient_ids=[1], description='Bowl 1')],
+            substeps_bowl2=[MixingSubstep(ingredient_ids=[2], description='Bowl 2')],
+        )
+        success, _ = engine.run(recipe=recipe)
+        assert success is True
+
+        tsp = wm.query_facts(fact_title='transfer_source_processed')
+        assert len(tsp) == 2
+
+    def test_step_request_has_transfer_item_type(self):
+        """step_request(step_type='TRANSFER_ITEM') exists."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Add butter')]
+
+        engine, wm, recipe = _make_engine(ingredients=ingredients, substeps=substeps, num_baking_sheets=5)
+        engine.run(recipe=recipe)
+
+        sr = wm.query_facts(fact_title='step_request', step_type='TRANSFER_ITEM')
+        assert len(sr) == 1
+        assert sr[0].attributes['step_idx'] == 1
+
+
+# ---------------------------------------------------------------------------
+# Equipment transfer dispatch intermediate facts
+# ---------------------------------------------------------------------------
+
+class TestEquipmentTransferDispatchFacts:
+    def test_equipment_transfer_initialized_fact(self):
+        """equipment_transfer_initialized has source/target equipment names."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=2, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Mix')]
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=2, num_ovens=1, oven_racks=2,
+            include_equipment_transfer=True,
+        )
+        success, _ = engine.run(recipe=recipe)
+        assert success is True
+
+        eti = wm.query_facts(fact_title='equipment_transfer_initialized')
+        assert len(eti) == 1
+        assert eti[0].attributes['source_equipment_name'] == 'BAKING_SHEET'
+        assert eti[0].attributes['target_equipment_name'] == 'OVEN'
+
+    def test_pending_placement_facts_match_sheets(self):
+        """N pending_placement facts = N sheets."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=2, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Mix')]
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=2, num_ovens=1, oven_racks=2,
+            include_equipment_transfer=True,
+        )
+        engine.run(recipe=recipe)
+
+        pp = wm.query_facts(fact_title='pending_placement')
+        assert len(pp) == 2
+
+    def test_placement_completed_facts_match_sheets(self):
+        """N placement_completed facts = N sheets."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=2, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Mix')]
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=2, num_ovens=1, oven_racks=2,
+            include_equipment_transfer=True,
+        )
+        engine.run(recipe=recipe)
+
+        pc = wm.query_facts(fact_title='placement_completed')
+        assert len(pc) == 2
+
+    def test_equipment_transfer_completed_fact(self):
+        """equipment_transfer_completed with step_idx."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=2, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Mix')]
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=2, num_ovens=1, oven_racks=2,
+            include_equipment_transfer=True,
+        )
+        engine.run(recipe=recipe)
+
+        etc = wm.query_facts(fact_title='equipment_transfer_completed')
+        # equipment_transfer_completed may come from both dispatch and lower-level rules
+        dispatch_level = [f for f in etc if 'step_idx' in f.attributes]
+        assert len(dispatch_level) >= 1
+
+    def test_preheat_completed_fact(self):
+        """At least 1 preheat_completed fact per oven."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=2, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Mix')]
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=2, num_ovens=1, oven_racks=2,
+            include_equipment_transfer=True,
+        )
+        engine.run(recipe=recipe)
+
+        ph = wm.query_facts(fact_title='preheat_completed')
+        assert len(ph) >= 1
+        assert ph[0].attributes['equipment_name'] == 'OVEN'

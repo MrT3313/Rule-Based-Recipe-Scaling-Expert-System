@@ -299,6 +299,139 @@ class TestCookingStartedFact:
             assert fact.attributes['duration_unit'] == 'minutes'
 
 
+class TestCookDispatchIntermediateFacts:
+    def test_cook_initialized_fact(self):
+        """cook_initialized has step_idx, source/target names, duration, duration_unit, num_sources."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+        )
+        success, _ = engine.run(recipe=recipe)
+        assert success is True
+
+        ci = wm.query_facts(fact_title='cook_initialized')
+        assert len(ci) == 1
+        assert ci[0].attributes['source_equipment_name'] == 'BAKING_SHEET'
+        assert ci[0].attributes['target_equipment_name'] == 'OVEN'
+        assert ci[0].attributes['duration'] == 10
+        assert ci[0].attributes['duration_unit'] == 'minutes'
+        assert ci[0].attributes['num_sources'] == 5
+
+    def test_pending_cook_placement_facts_match_sheets(self):
+        """N pending_cook_placement facts = N sheets."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+        )
+        engine.run(recipe=recipe)
+
+        pcp = wm.query_facts(fact_title='pending_cook_placement')
+        assert len(pcp) == 5
+
+    def test_cook_placement_completed_facts_match_sheets(self):
+        """N cook_placement_completed facts = N sheets."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+        )
+        engine.run(recipe=recipe)
+
+        cpc = wm.query_facts(fact_title='cook_placement_completed')
+        assert len(cpc) == 5
+
+    def test_cook_completed_fact(self):
+        """1 cook_completed fact with step_idx."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+        )
+        engine.run(recipe=recipe)
+
+        cc = wm.query_facts(fact_title='cook_completed')
+        assert len(cc) == 1
+
+    def test_preheat_completed_fact_in_cook(self):
+        """preheat_completed fact exists for the oven."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=2, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Mix')]
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=2, num_ovens=1, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+        )
+        engine.run(recipe=recipe)
+
+        ph = wm.query_facts(fact_title='preheat_completed')
+        assert len(ph) >= 1
+        assert ph[0].attributes['equipment_name'] == 'OVEN'
+
+    def test_equipment_transfer_plan_fact(self):
+        """equipment_transfer_plan has items_per_rack, capacity_per_target."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=2, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Mix')]
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=2, num_ovens=1, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+        )
+        engine.run(recipe=recipe)
+
+        etp = wm.query_facts(fact_title='equipment_transfer_plan', first=True)
+        assert etp is not None
+        assert 'items_per_rack' in etp.attributes
+        assert 'capacity_per_target' in etp.attributes
+
+    def test_equipment_contents_on_oven_tracks_sheets(self):
+        """N equipment_contents facts on OVEN after cook placement."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=2, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Mix')]
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=2, num_ovens=1, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+        )
+        engine.run(recipe=recipe)
+
+        ec = wm.query_facts(fact_title='equipment_contents', equipment_name='OVEN', equipment_id=1)
+        assert len(ec) == 2
+
+    def test_cook_failure_produces_no_cook_completed(self):
+        """Insufficient ovens → no cook_completed fact."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=2, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+        )
+        success, _ = engine.run(recipe=recipe)
+
+        assert success is False
+        cc = wm.query_facts(fact_title='cook_completed')
+        assert len(cc) == 0
+
+
 class TestCookStepFailure:
     def test_not_enough_ovens_fails(self):
         """5 sheets but only 2 ovens (4 rack slots) → should fail."""

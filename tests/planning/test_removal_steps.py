@@ -335,3 +335,300 @@ class TestEquipmentStateAfterRemoval:
         for sheet_id in [1, 2, 3, 4, 5]:
             state = wm.query_equipment_state(equipment_name='BAKING_SHEET', equipment_id=sheet_id)
             assert state == 'DIRTY', f"BAKING_SHEET #{sheet_id} should be DIRTY but is {state}"
+
+
+# ---------------------------------------------------------------------------
+# Removal dispatch intermediate facts
+# ---------------------------------------------------------------------------
+
+class TestRemovalDispatchIntermediateFacts:
+    def test_removal_initialized_fact(self):
+        """removal_initialized has source='OVEN', target='COUNTERTOP'."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+            include_removal_steps=True, include_item_transfer_steps=True,
+        )
+        success, _ = engine.run(recipe=recipe)
+        assert success is True
+
+        ri = wm.query_facts(fact_title='removal_initialized')
+        assert len(ri) == 1
+        assert ri[0].attributes['source_equipment_name'] == 'OVEN'
+        assert ri[0].attributes['target_equipment_name'] == 'COUNTERTOP'
+
+    def test_item_transfer_target_pre_asserted(self):
+        """item_transfer_target with target='COOLING_RACK'."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+            include_removal_steps=True, include_item_transfer_steps=True,
+        )
+        engine.run(recipe=recipe)
+
+        itt = wm.query_facts(fact_title='item_transfer_target')
+        assert len(itt) >= 1
+        assert itt[0].attributes['target_equipment_name'] == 'COOLING_RACK'
+
+    def test_removal_slot_processed_facts_match_sheets(self):
+        """N removal_slot_processed facts = N sheets (one per oven slot with a sheet)."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+            include_removal_steps=True, include_item_transfer_steps=True,
+        )
+        engine.run(recipe=recipe)
+
+        rsp = wm.query_facts(fact_title='removal_slot_processed')
+        assert len(rsp) == 5
+
+    def test_oven_wait_completed_facts_match_ovens(self):
+        """N oven_wait_completed facts = N ovens that had sheets."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+            include_removal_steps=True, include_item_transfer_steps=True,
+        )
+        engine.run(recipe=recipe)
+
+        owc = wm.query_facts(fact_title='oven_wait_completed')
+        oven_ids = {f.attributes['equipment_id'] for f in owc}
+        assert oven_ids == {1, 2, 3}
+
+    def test_removal_completed_fact(self):
+        """1 removal_completed fact."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+            include_removal_steps=True, include_item_transfer_steps=True,
+        )
+        engine.run(recipe=recipe)
+
+        rc = wm.query_facts(fact_title='removal_completed')
+        assert len(rc) == 1
+
+    def test_equipment_removal_completed_facts(self):
+        """N equipment_removal_completed facts per sheet."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+            include_removal_steps=True, include_item_transfer_steps=True,
+        )
+        engine.run(recipe=recipe)
+
+        erc = wm.query_facts(fact_title='equipment_removal_completed')
+        assert len(erc) == 5
+
+    def test_item_transfer_completed_from_dfs_chain(self):
+        """N item_transfer_completed facts per sheet (DFS-chained from removal)."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+            include_removal_steps=True, include_item_transfer_steps=True,
+        )
+        engine.run(recipe=recipe)
+
+        itc = wm.query_facts(fact_title='item_transfer_completed')
+        assert len(itc) == 5
+
+
+# ---------------------------------------------------------------------------
+# Surface transfer dispatch intermediate facts
+# ---------------------------------------------------------------------------
+
+class TestSurfaceTransferDispatchFacts:
+    def test_surface_transfer_completed_fact(self):
+        """1 surface_transfer_completed fact."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+            include_removal_steps=True, include_item_transfer_steps=True,
+        )
+        engine.run(recipe=recipe)
+
+        stc = wm.query_facts(fact_title='surface_transfer_completed')
+        assert len(stc) == 1
+
+    def test_step_request_equipment_removal_type(self):
+        """TransferEquipment(source=OVEN) -> step_request(step_type='EQUIPMENT_REMOVAL')."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+            include_removal_steps=True, include_item_transfer_steps=True,
+        )
+        engine.run(recipe=recipe)
+
+        sr = wm.query_facts(fact_title='step_request', step_type='EQUIPMENT_REMOVAL')
+        assert len(sr) == 1
+
+    def test_step_request_item_transfer_to_surface_type(self):
+        """TransferItem(target=COOLING_RACK) -> step_request(step_type='ITEM_TRANSFER_TO_SURFACE')."""
+        ingredients, substeps = _cookie_ingredients_and_substeps()
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=5, num_ovens=3, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+            include_removal_steps=True, include_item_transfer_steps=True,
+        )
+        engine.run(recipe=recipe)
+
+        sr = wm.query_facts(fact_title='step_request', step_type='ITEM_TRANSFER_TO_SURFACE')
+        assert len(sr) == 1
+
+
+# ---------------------------------------------------------------------------
+# Removal failure paths
+# ---------------------------------------------------------------------------
+
+class TestRemovalFailurePaths:
+    def test_removal_with_no_cooking_started_facts(self):
+        """Removal without cook step fails gracefully."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=2, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Mix')]
+
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=2, num_ovens=1, oven_racks=2,
+            include_cook_step=False,
+            include_removal_steps=True, include_item_transfer_steps=False,
+        )
+        success, error = engine.run(recipe=recipe)
+        assert success is False
+
+    def test_removal_with_no_target_surface(self):
+        """Removal with no COUNTERTOP surface fails."""
+        wm = WorkingMemory()
+        wm.add_fact(fact=Fact(
+            fact_title='EQUIPMENT', equipment_type='CONTAINER',
+            equipment_name='BOWL', equipment_id=1, state='AVAILABLE',
+            volume=4, volume_unit='QUARTS',
+        ), silent=True)
+        wm.add_fact(fact=Fact(
+            fact_title='EQUIPMENT', equipment_type='TRAY',
+            equipment_name='BAKING_SHEET', equipment_id=1, state='AVAILABLE',
+        ), silent=True)
+        wm.add_fact(fact=Fact(
+            fact_title='EQUIPMENT', equipment_type='APPLIANCE',
+            equipment_name='OVEN', equipment_id=1, state='IN_USE',
+            number_of_racks=2,
+        ), silent=True)
+        # No COUNTERTOP or COOLING_RACK
+
+        kb = KnowledgeBase()
+        kb.add_rules(rules=get_equipment_status_rules())
+        kb.add_rules(rules=get_ingredient_rules())
+        kb.add_rules(rules=get_transfer_rules())
+        kb.add_rules(rules=get_equipment_transfer_rules())
+        kb.add_rules(rules=get_cooking_rules())
+        kb.add_rules(rules=get_removal_rules())
+        kb.add_rules(rules=get_step_dispatch_rules())
+        kb.add_rules(rules=get_mixing_dispatch_rules())
+        kb.add_rules(rules=get_transfer_dispatch_rules())
+        kb.add_rules(rules=get_removal_dispatch_rules())
+        kb.add_rules(rules=get_surface_transfer_dispatch_rules())
+        kb.add_rules(rules=get_equipment_transfer_dispatch_rules())
+        kb.add_rules(rules=get_cook_dispatch_rules())
+        kb.add_reference_fact(fact=get_measurement_unit_conversion_facts())
+        kb.add_reference_fact(fact=get_transfer_reference_facts())
+
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+
+        recipe = Recipe(
+            name='Test Recipe',
+            ingredients=ingredients,
+            required_equipment=[{'equipment_name': 'BOWL', 'required_count': 1}],
+            steps=[
+                MixingStep(
+                    description='Mix',
+                    required_equipment=[{'equipment_name': 'BOWL', 'required_count': 1}],
+                    substeps=[MixingSubstep(ingredient_ids=[1], description='Add butter')],
+                ),
+                TransferItem(
+                    description='Scoop',
+                    source_equipment_name='BOWL',
+                    target_equipment_name='BAKING_SHEET',
+                    scoop_size_amount=2, scoop_size_unit='TABLESPOONS',
+                    required_equipment=[],
+                ),
+                CookStep(
+                    description='Bake',
+                    substeps=[
+                        TransferEquipment(
+                            description='Transfer to oven',
+                            source_equipment_name='BAKING_SHEET',
+                            target_equipment_name='OVEN',
+                            required_equipment=[],
+                        ),
+                        WaitStep(
+                            description='Bake',
+                            equipment_name='OVEN',
+                            duration=10, duration_unit='minutes',
+                        ),
+                    ],
+                    required_equipment=[],
+                ),
+                TransferEquipment(
+                    description='Remove from oven',
+                    source_equipment_name='OVEN',
+                    target_equipment_name='COUNTERTOP',
+                    required_equipment=[],
+                ),
+            ],
+        )
+
+        engine = PlanningEngine(wm=wm, kb=kb, verbose=False)
+        success, error = engine.run(recipe=recipe)
+        assert success is False
+
+    def test_removal_with_empty_oven(self):
+        """Removal with an oven that has no equipment_contents generates no removal steps."""
+        ingredients = [
+            Ingredient(id=1, name='butter', amount=1, unit='cups', measurement_category='VOLUME'),
+        ]
+        substeps = [MixingSubstep(ingredient_ids=[1], description='Mix')]
+
+        # 1 sheet, 1 oven (2 racks) — but we add a second oven that's empty
+        engine, wm, recipe = _make_engine(
+            ingredients=ingredients, substeps=substeps,
+            num_baking_sheets=1, num_ovens=1, oven_racks=2,
+            include_cook_step=True, cook_time=10, cook_time_unit='minutes',
+            include_removal_steps=True, include_item_transfer_steps=True,
+        )
+        success, plan = engine.run(recipe=recipe)
+        assert success is True
+
+        # Only 1 sheet was placed, so only 1 removal_slot_processed
+        rsp = wm.query_facts(fact_title='removal_slot_processed')
+        assert len(rsp) == 1

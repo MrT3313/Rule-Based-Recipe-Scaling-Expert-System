@@ -161,3 +161,40 @@ class TestMultiEquipmentResolution:
 
         assert success is False
         assert 'BOWL' in error_message
+
+
+# ---------------------------------------------------------------------------
+# equipment_cleaned fact derivation
+# ---------------------------------------------------------------------------
+
+class TestEquipmentCleanedFact:
+    def test_equipment_cleaned_fact_on_dirty(self):
+        """equipment_cleaned derived when resolving DIRTY oven."""
+        engine, wm, recipe = _make_oven_engine('DIRTY')
+        success, plan = engine.run(recipe=recipe)
+
+        assert success is True
+        ec = wm.query_facts(fact_title='equipment_cleaned')
+        assert len(ec) == 1
+        assert ec[0].attributes['equipment_name'] == 'OVEN'
+        assert ec[0].attributes['equipment_id'] == 1
+
+    def test_no_cleaned_fact_when_available(self):
+        """No equipment_cleaned when oven is already AVAILABLE."""
+        engine, wm, recipe = _make_oven_engine('AVAILABLE')
+        success, plan = engine.run(recipe=recipe)
+
+        assert success is True
+        ec = wm.query_facts(fact_title='equipment_cleaned')
+        assert len(ec) == 0
+
+    def test_multiple_dirty_bowls_multiple_cleaned(self):
+        """2 equipment_cleaned facts for 2 DIRTY bowls."""
+        engine, wm, recipe = _make_bowl_engine(['DIRTY', 'DIRTY'])
+        success, plan = engine.run(recipe=recipe)
+
+        assert success is True
+        ec = wm.query_facts(fact_title='equipment_cleaned')
+        assert len(ec) == 2
+        names = {f.attributes['equipment_name'] for f in ec}
+        assert names == {'BOWL'}
