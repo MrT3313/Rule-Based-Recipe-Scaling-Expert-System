@@ -7,8 +7,8 @@ from classes.Recipe import Recipe
 from classes.WorkingMemory import WorkingMemory
 from planning.classes.MixingStep import MixingStep
 from planning.classes.MixingSubstep import MixingSubstep
-from planning.classes.TransferStep import TransferStep
-from planning.classes.EquipmentTransferStep import EquipmentTransferStep
+from planning.classes.TransferItem import TransferItem
+from planning.classes.TransferEquipment import TransferEquipment
 from planning.classes.Step import Step
 from planning.engine import PlanningEngine
 from planning.rules.equipment_status import get_equipment_status_rules
@@ -74,7 +74,7 @@ def _make_engine(*, ingredients, substeps, bowl_volume=4, bowl_volume_unit='QUAR
 
     if include_transfer:
         steps.append(
-            TransferStep(
+            TransferItem(
                 description='Scoop dough onto baking sheets',
                 source_equipment_name='BOWL',
                 target_equipment_name='BAKING_SHEET',
@@ -86,7 +86,7 @@ def _make_engine(*, ingredients, substeps, bowl_volume=4, bowl_volume_unit='QUAR
 
     if include_equipment_transfer:
         steps.append(
-            EquipmentTransferStep(
+            TransferEquipment(
                 description='Transfer baking sheets to oven racks',
                 source_equipment_name='BAKING_SHEET',
                 target_equipment_name='OVEN',
@@ -147,7 +147,7 @@ def _make_two_bowl_engine(*, ingredients, substeps_bowl1, substeps_bowl2,
             required_equipment=[{'equipment_name': 'BOWL', 'required_count': 1}],
             substeps=substeps_bowl2,
         ),
-        TransferStep(
+        TransferItem(
             description='Scoop dough onto baking sheets',
             source_equipment_name='BOWL',
             target_equipment_name='BAKING_SHEET',
@@ -451,7 +451,7 @@ class TestPlanTransferStepsPerSheet:
 
         assert success is True
 
-        transfer_steps = [s for s in plan if isinstance(s, TransferStep)]
+        transfer_steps = [s for s in plan if isinstance(s, TransferItem)]
         # 26 dough balls / 8 per sheet = 4 sheets
         assert len(transfer_steps) == 4
 
@@ -502,7 +502,7 @@ class TestTransferFailures:
             ingredients=[],
             required_equipment=[],
             steps=[
-                TransferStep(
+                TransferItem(
                     description='Scoop dough',
                     source_equipment_name='BOWL',
                     target_equipment_name='BAKING_SHEET',
@@ -540,7 +540,7 @@ class TestTransferFailures:
 
     def test_transfer_step_no_source_equipment_id_attribute(self):
         """TransferStep no longer has a source_equipment_id attribute."""
-        step = TransferStep(
+        step = TransferItem(
             description='Scoop dough',
             source_equipment_name='BOWL',
             target_equipment_name='BAKING_SHEET',
@@ -645,7 +645,7 @@ class TestEquipmentTransferPlanLength:
 
         assert success is True
 
-        # 1 MixingStep + 5 TransferSteps + 3 preheat waits + 5 EquipmentTransferSteps = 14
+        # 1 MixingStep + 5 TransferSteps + 3 preheat waits + 5 TransferEquipments = 14
         assert len(plan) == 14
 
         preheat_steps = [s for s in plan if s.description.startswith('Wait for OVEN')]
@@ -654,7 +654,7 @@ class TestEquipmentTransferPlanLength:
         assert 'OVEN #2' in preheat_steps[1].description
         assert 'OVEN #3' in preheat_steps[2].description
 
-        equip_transfer_steps = [s for s in plan if isinstance(s, EquipmentTransferStep)]
+        equip_transfer_steps = [s for s in plan if isinstance(s, TransferEquipment)]
         assert len(equip_transfer_steps) == 5
 
     def test_two_sheets_one_oven(self):
@@ -680,13 +680,13 @@ class TestEquipmentTransferPlanLength:
 
         assert success is True
 
-        # 1 MixingStep + 2 TransferSteps + 1 preheat wait + 2 EquipmentTransferSteps = 6
+        # 1 MixingStep + 2 TransferSteps + 1 preheat wait + 2 TransferEquipments = 6
         assert len(plan) == 6
 
         preheat_steps = [s for s in plan if s.description.startswith('Wait for OVEN')]
         assert len(preheat_steps) == 1
 
-        equip_transfer_steps = [s for s in plan if isinstance(s, EquipmentTransferStep)]
+        equip_transfer_steps = [s for s in plan if isinstance(s, TransferEquipment)]
         assert len(equip_transfer_steps) == 2
 
     def test_not_enough_ovens_fails(self):

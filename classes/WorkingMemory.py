@@ -10,6 +10,12 @@ class WorkingMemory:
         if not silent:
             print(f"{indent}[Asserted] {fact}")
 
+    def remove_fact(self, *, fact, indent="", silent=False):
+        if fact in self.facts:
+            self.facts.remove(fact)
+            if not silent:
+                print(f"{indent}[Retracted] {fact}")
+
     def query_equipment(self, *, equipment_name, first=False, **attributes):
         results = []
         

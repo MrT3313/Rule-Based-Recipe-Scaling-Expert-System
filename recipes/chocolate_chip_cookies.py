@@ -3,8 +3,8 @@ from classes.Ingredient import Ingredient
 from planning.classes.PreparationStep import PreheatStep
 from planning.classes.MixingStep import MixingStep
 from planning.classes.MixingSubstep import MixingSubstep
-from planning.classes.TransferStep import TransferStep
-from planning.classes.EquipmentTransferStep import EquipmentTransferStep
+from planning.classes.TransferEquipment import TransferEquipment
+from planning.classes.TransferItem import TransferItem
 from planning.classes.CookStep import CookStep
 from planning.classes.WaitStep import WaitStep
 
@@ -57,7 +57,7 @@ chocolate_chip_cookies_recipe = Recipe(
                 MixingSubstep(ingredient_ids=[1, 7, 8], description="Mix in flour, baking soda, and salt"),
             ]
         ),
-        TransferStep(
+        TransferItem(
             description="Scoop dough onto baking sheets",
             source_equipment_name='BOWL',
             target_equipment_name='BAKING_SHEET',
@@ -68,7 +68,7 @@ chocolate_chip_cookies_recipe = Recipe(
         CookStep(
             description="Bake the cookies",
             substeps=[
-                EquipmentTransferStep(
+                TransferEquipment(
                     description="Transfer baking sheets to oven racks",
                     source_equipment_name='BAKING_SHEET',
                     target_equipment_name='OVEN',
@@ -81,6 +81,20 @@ chocolate_chip_cookies_recipe = Recipe(
                     duration_unit='minutes',
                 ),
             ],
+            required_equipment=[],
+        ),
+        TransferEquipment(
+            description="Remove baking sheets from oven to countertop",
+            source_equipment_name='OVEN',
+            target_equipment_name='COUNTERTOP',
+            required_equipment=[],
+        ),
+        TransferItem(
+            description="Transfer cookies from baking sheets to cooling rack",
+            source_equipment_name='BAKING_SHEET',
+            target_equipment_name='COOLING_RACK',
+            scoop_size_amount=1,
+            scoop_size_unit='WHOLE',
             required_equipment=[],
         ),
     ],

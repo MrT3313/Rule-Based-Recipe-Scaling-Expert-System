@@ -8,6 +8,7 @@ from planning.rules.ingredient_rules import get_ingredient_rules
 from planning.rules.transfer_rules import get_transfer_rules
 from planning.rules.equipment_transfer_rules import get_equipment_transfer_rules
 from planning.rules.cooking_rules import get_cooking_rules
+from planning.rules.removal_rules import get_removal_rules
 
 # reference facts
 from scaling.facts.measurement_unit_conversions import get_measurement_unit_conversion_facts
@@ -52,6 +53,22 @@ def main(*, wm, kb, recipe, args):
             state='AVAILABLE',
         ), silent=True)
 
+    wm.add_fact(fact=Fact(
+        fact_title='EQUIPMENT',
+        equipment_type='SURFACE',
+        equipment_name='COUNTERTOP',
+        equipment_id=1,
+        state='AVAILABLE',
+    ), silent=True)
+
+    wm.add_fact(fact=Fact(
+        fact_title='EQUIPMENT',
+        equipment_type='SURFACE',
+        equipment_name='COOLING_RACK',
+        equipment_id=1,
+        state='AVAILABLE',
+    ), silent=True)
+
     equipment_status_rules = get_equipment_status_rules()
     kb.add_rules(rules=equipment_status_rules)
     print(f"Added {len(equipment_status_rules)} equipment status rules")
@@ -71,6 +88,10 @@ def main(*, wm, kb, recipe, args):
     cooking_rules = get_cooking_rules()
     kb.add_rules(rules=cooking_rules)
     print(f"Added {len(cooking_rules)} cooking rules")
+
+    removal_rules = get_removal_rules()
+    kb.add_rules(rules=removal_rules)
+    print(f"Added {len(removal_rules)} removal rules")
 
     unit_conversion_facts = get_measurement_unit_conversion_facts()
     kb.add_reference_fact(fact=unit_conversion_facts)
