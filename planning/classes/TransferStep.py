@@ -1,0 +1,13 @@
+from planning.classes.Step import Step
+
+
+class TransferStep(Step):
+    def __init__(self, *, description, required_equipment=[], substeps=[], is_passive=False,
+                 source_equipment_name, target_equipment_name,
+                 scoop_size_amount, scoop_size_unit):
+        super().__init__(description=description, required_equipment=required_equipment, substeps=substeps, is_passive=is_passive)
+
+        self.source_equipment_name = source_equipment_name
+        self.target_equipment_name = target_equipment_name
+        self.scoop_size_amount = scoop_size_amount
+        self.scoop_size_unit = scoop_size_unit

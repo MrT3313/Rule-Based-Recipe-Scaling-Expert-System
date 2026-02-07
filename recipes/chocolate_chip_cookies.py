@@ -3,6 +3,7 @@ from classes.Ingredient import Ingredient
 from planning.classes.PreparationStep import PreheatStep
 from planning.classes.MixingStep import MixingStep
 from planning.classes.MixingSubstep import MixingSubstep
+from planning.classes.TransferStep import TransferStep
 
 chocolate_chip_cookies_recipe = Recipe(
     name="chocolate_chip_cookies",
@@ -52,6 +53,14 @@ chocolate_chip_cookies_recipe = Recipe(
                 MixingSubstep(ingredient_ids=[5, 6], description="Beat in eggs and vanilla"),
                 MixingSubstep(ingredient_ids=[1, 7, 8], description="Mix in flour, baking soda, and salt"),
             ]
-        )
+        ),
+        TransferStep(
+            description="Scoop dough onto baking sheets",
+            source_equipment_name='BOWL',
+            target_equipment_name='BAKING_SHEET',
+            scoop_size_amount=2,
+            scoop_size_unit='TABLESPOONS',
+            required_equipment=[],
+        ),
     ],
 )

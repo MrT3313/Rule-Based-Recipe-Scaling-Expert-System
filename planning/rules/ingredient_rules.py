@@ -77,6 +77,31 @@ def _add_ingredient_to_equipment(*, bindings, wm, kb, plan):
     return bindings
 
 
+def _summarize_mixed_contents(*, bindings, wm, kb, plan):
+    equipment_name = bindings['?equipment_name']
+    equipment_id = bindings['?equipment_id']
+
+    # Sum volume across all equipment_contents for this piece of equipment
+    contents = wm.query_facts(
+        fact_title='equipment_contents',
+        equipment_name=equipment_name,
+        equipment_id=equipment_id,
+    )
+    total_volume = sum(f.attributes.get('volume_in_equipment_unit', 0) for f in contents)
+
+    # Look up the equipment fact to get volume_unit
+    equipment_fact = wm.query_equipment(
+        equipment_name=equipment_name,
+        equipment_id=equipment_id,
+        first=True,
+    )
+    volume_unit = equipment_fact.attributes.get('volume_unit', '') if equipment_fact else ''
+
+    bindings['?total_volume'] = total_volume
+    bindings['?volume_unit'] = volume_unit
+    return bindings
+
+
 def get_ingredient_rules():
     rules = []
 
@@ -104,6 +129,26 @@ def get_ingredient_rules():
                 equipment_name='?equipment_name',
                 equipment_id='?equipment_id',
                 volume_in_equipment_unit='?volume_in_equipment_unit',
+            ),
+        )
+    )
+
+    rules.append(
+        Rule(
+            rule_name='summarize_mixed_contents',
+            priority=90,
+            antecedents=[
+                Fact(fact_title='mixing_completed',
+                     equipment_name='?equipment_name',
+                     equipment_id='?equipment_id'),
+            ],
+            action_fn=_summarize_mixed_contents,
+            consequent=Fact(
+                fact_title='mixed_contents',
+                equipment_name='?equipment_name',
+                equipment_id='?equipment_id',
+                total_volume='?total_volume',
+                volume_unit='?volume_unit',
             ),
         )
     )

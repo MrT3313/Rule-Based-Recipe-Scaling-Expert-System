@@ -1,4 +1,6 @@
 from classes.Fact import Fact
+from planning.classes.MixingStep import MixingStep
+from planning.classes.TransferStep import TransferStep
 
 
 class PlanningEngine:
@@ -28,6 +30,13 @@ class PlanningEngine:
                         print(f"  -> FAILED to resolve equipment: {equipment_name}")
                     return (False, f"{equipment_name} could not be resolved")
 
+            # TransferStep handles its own equipment resolution iteratively
+            if isinstance(step, TransferStep):
+                success, error = self._execute_transfer_step(step, recipe)
+                if not success:
+                    return (False, error)
+                continue
+
             # Transition resolved equipment from RESERVED -> IN_USE
             for eq in resolved_equipment:
                 eq.attributes['state'] = 'IN_USE'
@@ -39,6 +48,25 @@ class PlanningEngine:
                 success, error = self._execute_substeps(step, recipe, resolved_equipment)
                 if not success:
                     return (False, error)
+
+            # After MixingStep substeps succeed, derive mixed_contents via rules
+            if isinstance(step, MixingStep):
+                for eq in resolved_equipment:
+                    if eq.attributes.get('equipment_type') == 'CONTAINER':
+                        trigger = Fact(
+                            fact_title='mixing_completed',
+                            equipment_name=eq.attributes['equipment_name'],
+                            equipment_id=eq.attributes['equipment_id'],
+                        )
+                        self.working_memory.add_fact(fact=trigger, indent="  ")
+                        matches = self._find_matching_rules(trigger)
+                        if matches:
+                            best_rule, best_bindings = self._resolve_conflict(matches)
+                            derived = self._fire_rule(best_rule, best_bindings)
+                            if self.verbose:
+                                print(f"  [Rule fired] {best_rule.rule_name}")
+                                if derived is not None:
+                                    print(f"  [Derived] {derived}")
 
             # APPEND TO PLAN
             self.plan.append(step)
@@ -104,6 +132,134 @@ class PlanningEngine:
                 # Check for errors from the action_fn
                 if '?error' in best_bindings:
                     return (False, best_bindings['?error'])
+
+        return (True, None)
+
+    def _execute_transfer_step(self, step, recipe):
+        """Execute a TransferStep: discover sources from mixed_contents, plan, then loop per target sheet."""
+        # Phase 0 — Discover sources from derived mixed_contents facts
+        sources = self.working_memory.query_facts(
+            fact_title='mixed_contents',
+            equipment_name=step.source_equipment_name,
+        )
+        if not sources:
+            return (False, f"No mixed_contents found for {step.source_equipment_name}")
+
+        for source in sources:
+            source_equipment_id = source.attributes['equipment_id']
+
+            if self.verbose:
+                print(f"\n  Processing {step.source_equipment_name} #{source_equipment_id} "
+                      f"(total_volume={source.attributes['total_volume']:.2f} {source.attributes['volume_unit']})")
+
+            # Phase 1 — Fire planning rule (domain logic in rule)
+            planning_request = Fact(
+                fact_title='transfer_planning_request',
+                source_equipment_name=step.source_equipment_name,
+                source_equipment_id=source_equipment_id,
+                scoop_size_amount=step.scoop_size_amount,
+                scoop_size_unit=step.scoop_size_unit,
+                target_equipment_name=step.target_equipment_name,
+            )
+            self.working_memory.add_fact(fact=planning_request, indent="  ")
+
+            matches = self._find_matching_rules(planning_request)
+            if not matches:
+                return (False, "No rule matched for transfer_planning_request")
+
+            best_rule, best_bindings = self._resolve_conflict(matches)
+            derived = self._fire_rule(best_rule, best_bindings)
+
+            if '?error' in best_bindings:
+                return (False, best_bindings['?error'])
+
+            if self.verbose:
+                print(f"  [Rule fired] {best_rule.rule_name}")
+                if derived is not None:
+                    print(f"  [Derived] {derived}")
+
+            # Read transfer_plan from WM
+            transfer_plan = self.working_memory.query_facts(
+                fact_title='transfer_plan',
+                first=True,
+            )
+            if transfer_plan is None:
+                return (False, "transfer_plan fact not found after planning rule")
+
+            num_dough_balls = transfer_plan.attributes['num_dough_balls']
+            capacity_per_sheet = transfer_plan.attributes['capacity_per_sheet']
+            num_sheets_needed = transfer_plan.attributes['num_sheets_needed']
+
+            if self.verbose:
+                print(f"\n  Transfer plan: {num_dough_balls} dough balls, {capacity_per_sheet}/sheet, {num_sheets_needed} sheet(s) needed")
+
+            # Phase 2 — Loop per sheet (engine orchestration)
+            remaining = num_dough_balls
+            for sheet_idx in range(num_sheets_needed):
+                equipment_need = {'equipment_name': step.target_equipment_name, 'required_count': 1}
+                resolved_list = self._resolve_equipment(equipment_need)
+                if resolved_list is None:
+                    return (False, f"Could not resolve {step.target_equipment_name} for sheet {sheet_idx + 1}")
+
+                target_eq = resolved_list[0]
+                target_eq.attributes['state'] = 'IN_USE'
+                target_eq_id = target_eq.attributes['equipment_id']
+
+                quantity = min(remaining, capacity_per_sheet)
+
+                if self.verbose:
+                    print(f"\n  Sheet {sheet_idx + 1}: {step.target_equipment_name} #{target_eq_id} — placing {quantity} dough balls")
+
+                # Assert transfer_request trigger fact
+                transfer_request = Fact(
+                    fact_title='transfer_request',
+                    source_equipment_name=step.source_equipment_name,
+                    source_equipment_id=source_equipment_id,
+                    target_equipment_name=step.target_equipment_name,
+                    target_equipment_id=target_eq_id,
+                    quantity=quantity,
+                    scoop_size_amount=step.scoop_size_amount,
+                    scoop_size_unit=step.scoop_size_unit,
+                )
+                self.working_memory.add_fact(fact=transfer_request, indent="    ")
+
+                matches = self._find_matching_rules(transfer_request)
+                if not matches:
+                    return (False, f"No rule matched for transfer_request on sheet {sheet_idx + 1}")
+
+                best_rule, best_bindings = self._resolve_conflict(matches)
+                derived = self._fire_rule(best_rule, best_bindings)
+
+                if '?error' in best_bindings:
+                    return (False, best_bindings['?error'])
+
+                if self.verbose:
+                    print(f"    [Rule fired] {best_rule.rule_name}")
+                    if derived is not None:
+                        print(f"    [Derived] {derived}")
+
+                remaining -= quantity
+
+                # Append a per-sheet TransferStep to the plan
+                sheet_step = TransferStep(
+                    description=f"Transfer {quantity} dough balls to {step.target_equipment_name} #{target_eq_id}",
+                    source_equipment_name=step.source_equipment_name,
+                    target_equipment_name=step.target_equipment_name,
+                    scoop_size_amount=step.scoop_size_amount,
+                    scoop_size_unit=step.scoop_size_unit,
+                )
+                self.plan.append(sheet_step)
+
+            # Phase 3 — Cleanup: mark source equipment DIRTY
+            source_eq = self.working_memory.query_equipment(
+                equipment_name=step.source_equipment_name,
+                equipment_id=source_equipment_id,
+                first=True,
+            )
+            if source_eq:
+                source_eq.attributes['state'] = 'DIRTY'
+                if self.verbose:
+                    print(f"\n  -> {step.source_equipment_name} #{source_equipment_id} is now DIRTY")
 
         return (True, None)
 
