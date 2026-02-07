@@ -5,6 +5,8 @@ from planning.classes.MixingStep import MixingStep
 from planning.classes.MixingSubstep import MixingSubstep
 from planning.classes.TransferStep import TransferStep
 from planning.classes.EquipmentTransferStep import EquipmentTransferStep
+from planning.classes.CookStep import CookStep
+from planning.classes.WaitStep import WaitStep
 
 chocolate_chip_cookies_recipe = Recipe(
     name="chocolate_chip_cookies",
@@ -63,10 +65,22 @@ chocolate_chip_cookies_recipe = Recipe(
             scoop_size_unit='TABLESPOONS',
             required_equipment=[],
         ),
-        EquipmentTransferStep(
-            description="Transfer baking sheets to oven racks",
-            source_equipment_name='BAKING_SHEET',
-            target_equipment_name='OVEN',
+        CookStep(
+            description="Bake the cookies",
+            substeps=[
+                EquipmentTransferStep(
+                    description="Transfer baking sheets to oven racks",
+                    source_equipment_name='BAKING_SHEET',
+                    target_equipment_name='OVEN',
+                    required_equipment=[],
+                ),
+                WaitStep(
+                    description="Wait for cookies to bake",
+                    equipment_name='OVEN',
+                    duration=10,
+                    duration_unit='minutes',
+                ),
+            ],
             required_equipment=[],
         ),
     ],

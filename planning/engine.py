@@ -2,6 +2,8 @@ from classes.Fact import Fact
 from planning.classes.MixingStep import MixingStep
 from planning.classes.TransferStep import TransferStep
 from planning.classes.EquipmentTransferStep import EquipmentTransferStep
+from planning.classes.CookStep import CookStep
+from planning.classes.WaitStep import WaitStep
 from planning.classes.Step import Step
 
 
@@ -42,6 +44,13 @@ class PlanningEngine:
             # EquipmentTransferStep: equipment-to-equipment transfers (e.g., sheet → oven)
             if isinstance(step, EquipmentTransferStep):
                 success, error = self._execute_equipment_transfer_step(step, recipe)
+                if not success:
+                    return (False, error)
+                continue
+
+            # CookStep: equipment transfer + cooking wait
+            if isinstance(step, CookStep):
+                success, error = self._execute_cook_step(step, recipe)
                 if not success:
                     return (False, error)
                 continue
@@ -469,6 +478,317 @@ class PlanningEngine:
 
         return (True, None)
 
+    def _execute_cook_step(self, step, recipe):
+        """Execute a CookStep: reuse equipment transfer phases 0-2, then track oven fullness for cooking waits.
+        Creates one CookStep per oven, each with its own substeps (preheat, transfers, wait)."""
+        # Read source/target from the EquipmentTransferStep template in substeps
+        transfer_template = None
+        for sub in step.substeps:
+            if isinstance(sub, EquipmentTransferStep):
+                transfer_template = sub
+                break
+
+        if transfer_template is None:
+            return (False, "CookStep has no EquipmentTransferStep substep template")
+
+        # Read duration from WaitStep template in substeps
+        wait_template = next((s for s in step.substeps if isinstance(s, WaitStep)), None)
+        if wait_template is None:
+            return (False, "CookStep has no WaitStep substep template")
+
+        duration = wait_template.duration
+        duration_unit = wait_template.duration_unit
+
+        source_equipment_name = transfer_template.source_equipment_name
+        target_equipment_name = transfer_template.target_equipment_name
+
+        # Per-oven substep tracking
+        oven_substeps = {}  # oven_id -> list of substeps
+        current_oven_id = None
+
+        # Phase 0 — Discover source equipment (IN_USE sheets with DOUGH_BALLS contents)
+        source_contents = self.working_memory.query_facts(
+            fact_title='equipment_contents',
+            equipment_name=source_equipment_name,
+            content_type='DOUGH_BALLS',
+        )
+        if not source_contents:
+            return (False, f"No {source_equipment_name} found with DOUGH_BALLS contents")
+
+        source_ids = []
+        for content in source_contents:
+            sid = content.attributes['equipment_id']
+            if sid not in source_ids:
+                source_ids.append(sid)
+
+        if self.verbose:
+            print(f"\n  Found {len(source_ids)} {source_equipment_name}(s) with dough balls: {source_ids}")
+
+        # Phase 1 — Preheat wait: assert preheat_check_request → fire rule
+        preheat_request = Fact(
+            fact_title='preheat_check_request',
+            target_equipment_name=target_equipment_name,
+        )
+        self.working_memory.add_fact(fact=preheat_request, indent="  ")
+
+        matches = self._find_matching_rules(preheat_request)
+        if not matches:
+            return (False, "No rule matched for preheat_check_request")
+
+        best_rule, best_bindings = self._resolve_conflict(matches)
+
+        # Get oven_id from bindings for the first oven
+        current_oven_id = best_bindings.get('?equipment_id')
+        if current_oven_id is None:
+            # Fallback: query the first IN_USE oven
+            first_oven = self.working_memory.query_equipment(
+                equipment_name=target_equipment_name,
+                state='IN_USE',
+                first=True,
+            )
+            if first_oven:
+                current_oven_id = first_oven.attributes['equipment_id']
+            else:
+                return (False, "No IN_USE oven found for preheat")
+
+        oven_substeps[current_oven_id] = []
+        derived = self._fire_rule(best_rule, best_bindings, plan_override=oven_substeps[current_oven_id])
+
+        if '?error' in best_bindings:
+            return (False, best_bindings['?error'])
+
+        if self.verbose:
+            print(f"  [Rule fired] {best_rule.rule_name}")
+            if derived is not None:
+                print(f"  [Derived] {derived}")
+
+        # Phase 2 — Plan: assert equipment_transfer_planning_request → fire rule
+        planning_request = Fact(
+            fact_title='equipment_transfer_planning_request',
+            source_equipment_name=source_equipment_name,
+            target_equipment_name=target_equipment_name,
+            num_source_items=len(source_ids),
+        )
+        self.working_memory.add_fact(fact=planning_request, indent="  ")
+
+        matches = self._find_matching_rules(planning_request)
+        if not matches:
+            return (False, "No rule matched for equipment_transfer_planning_request")
+
+        best_rule, best_bindings = self._resolve_conflict(matches)
+        derived = self._fire_rule(best_rule, best_bindings)
+
+        if '?error' in best_bindings:
+            return (False, best_bindings['?error'])
+
+        if self.verbose:
+            print(f"  [Rule fired] {best_rule.rule_name}")
+            if derived is not None:
+                print(f"  [Derived] {derived}")
+
+        # Read equipment_transfer_plan from WM
+        transfer_plan = self.working_memory.query_facts(
+            fact_title='equipment_transfer_plan',
+            first=True,
+        )
+        if transfer_plan is None:
+            return (False, "equipment_transfer_plan fact not found after planning rule")
+
+        if self.verbose:
+            items_per_rack = transfer_plan.attributes['items_per_rack']
+            capacity_per_target = transfer_plan.attributes['capacity_per_target']
+            num_targets_needed = transfer_plan.attributes['num_targets_needed']
+            print(f"\n  Transfer plan: {len(source_ids)} sheets, {items_per_rack}/rack, "
+                  f"{capacity_per_target}/oven, {num_targets_needed} oven(s) needed")
+
+        # Phase 3 — Demand-driven loop with cooking wait tracking
+        remaining_sources = list(source_ids)
+        # Track which ovens have already had a cooking_wait_request fired
+        ovens_with_cooking_started = set()
+
+        while remaining_sources:
+            # Step A — Ask rule system: "Is there an available rack?"
+            rack_request = Fact(
+                fact_title='available_rack_request',
+                target_equipment_name=target_equipment_name,
+            )
+            self.working_memory.add_fact(fact=rack_request, indent="    ")
+
+            matches = self._find_matching_rules(rack_request)
+            if not matches:
+                return (False, "No rule matched for available_rack_request")
+
+            best_rule, best_bindings = self._resolve_conflict(matches)
+            derived = self._fire_rule(best_rule, best_bindings)
+
+            if self.verbose:
+                print(f"    [Rule fired] {best_rule.rule_name}")
+                if derived is not None:
+                    print(f"    [Derived] {derived}")
+
+            rack_found = best_bindings.get('?rack_found', False)
+
+            # Step B — If no rack found, the current oven is full → fire cooking wait, finalize CookStep, then resolve new oven
+            if not rack_found:
+                # Fire cooking_wait_request for all full ovens that haven't had one yet
+                in_use_ovens = self.working_memory.query_equipment(
+                    equipment_name=target_equipment_name,
+                    state='IN_USE',
+                )
+                for oven in in_use_ovens:
+                    oven_id = oven.attributes['equipment_id']
+                    if oven_id not in ovens_with_cooking_started:
+                        num_racks = oven.attributes.get('number_of_racks', 1)
+                        existing_contents = self.working_memory.query_facts(
+                            fact_title='equipment_contents',
+                            equipment_name=target_equipment_name,
+                            equipment_id=oven_id,
+                        )
+                        if len(existing_contents) >= num_racks:
+                            self._fire_cooking_wait(duration, duration_unit, oven_id, target_equipment_name, oven_substeps[oven_id])
+                            ovens_with_cooking_started.add(oven_id)
+                            # Finalize this oven's CookStep
+                            self._finalize_oven_cook_step(step, oven_id, target_equipment_name, oven_substeps)
+
+                # Resolve a new oven
+                equipment_need = {'equipment_name': target_equipment_name, 'required_count': 1}
+                resolved_list = self._resolve_equipment(equipment_need)
+                if resolved_list is None:
+                    return (False, f"Could not resolve additional {target_equipment_name}")
+
+                new_oven = resolved_list[0]
+                new_oven.attributes['state'] = 'IN_USE'
+                new_oven_id = new_oven.attributes['equipment_id']
+
+                # Initialize substeps for the new oven with preheat wait
+                oven_substeps[new_oven_id] = []
+                oven_substeps[new_oven_id].append(Step(
+                    description=f"Wait for {target_equipment_name} #{new_oven_id} to preheat",
+                ))
+                current_oven_id = new_oven_id
+
+                if self.verbose:
+                    print(f"\n  -> Resolved and preheated {target_equipment_name} #{new_oven_id}")
+
+                # Re-ask the rule system now that a new oven is IN_USE
+                rack_request2 = Fact(
+                    fact_title='available_rack_request',
+                    target_equipment_name=target_equipment_name,
+                )
+                self.working_memory.add_fact(fact=rack_request2, indent="    ")
+
+                matches2 = self._find_matching_rules(rack_request2)
+                if not matches2:
+                    return (False, "No rule matched for available_rack_request after resolving new equipment")
+
+                best_rule2, best_bindings2 = self._resolve_conflict(matches2)
+                derived2 = self._fire_rule(best_rule2, best_bindings2)
+
+                if self.verbose:
+                    print(f"    [Rule fired] {best_rule2.rule_name}")
+                    if derived2 is not None:
+                        print(f"    [Derived] {derived2}")
+
+                rack_found = best_bindings2.get('?rack_found', False)
+                if not rack_found:
+                    return (False, f"Still no available rack after resolving {target_equipment_name}")
+
+                best_bindings = best_bindings2
+
+            oven_id = best_bindings['?equipment_id']
+            rack_num = best_bindings['?rack_number']
+            source_id = remaining_sources.pop(0)
+
+            if self.verbose:
+                print(f"\n  {target_equipment_name} #{oven_id}, Rack {rack_num}: "
+                      f"placing {source_equipment_name} #{source_id}")
+
+            # Step C — Assert equipment_transfer_request → fire execute_equipment_transfer rule
+            transfer_request = Fact(
+                fact_title='equipment_transfer_request',
+                target_equipment_name=target_equipment_name,
+                target_equipment_id=oven_id,
+                slot_number=rack_num,
+                source_equipment_name=source_equipment_name,
+                source_equipment_id=source_id,
+            )
+            self.working_memory.add_fact(fact=transfer_request, indent="    ")
+
+            matches = self._find_matching_rules(transfer_request)
+            if not matches:
+                return (False, f"No rule matched for equipment_transfer_request on rack {rack_num}")
+
+            best_rule, best_bindings = self._resolve_conflict(matches)
+            derived = self._fire_rule(best_rule, best_bindings)
+
+            if '?error' in best_bindings:
+                return (False, best_bindings['?error'])
+
+            if self.verbose:
+                print(f"    [Rule fired] {best_rule.rule_name}")
+                if derived is not None:
+                    print(f"    [Derived] {derived}")
+
+            # Append per-rack EquipmentTransferStep to the oven's substeps
+            rack_step = EquipmentTransferStep(
+                description=f"Place {source_equipment_name} #{source_id} on {target_equipment_name} #{oven_id} rack {rack_num}",
+                source_equipment_name=source_equipment_name,
+                target_equipment_name=target_equipment_name,
+            )
+            oven_substeps[oven_id].append(rack_step)
+
+            # Check if this was the last sheet — fire cooking wait for any oven with sheets that hasn't started cooking
+            if not remaining_sources:
+                in_use_ovens = self.working_memory.query_equipment(
+                    equipment_name=target_equipment_name,
+                    state='IN_USE',
+                )
+                for oven in in_use_ovens:
+                    oid = oven.attributes['equipment_id']
+                    if oid not in ovens_with_cooking_started:
+                        # Check this oven actually has contents
+                        existing_contents = self.working_memory.query_facts(
+                            fact_title='equipment_contents',
+                            equipment_name=target_equipment_name,
+                            equipment_id=oid,
+                        )
+                        if len(existing_contents) > 0:
+                            self._fire_cooking_wait(duration, duration_unit, oid, target_equipment_name, oven_substeps[oid])
+                            ovens_with_cooking_started.add(oid)
+                            # Finalize this oven's CookStep
+                            self._finalize_oven_cook_step(step, oid, target_equipment_name, oven_substeps)
+
+        return (True, None)
+
+    def _finalize_oven_cook_step(self, step, oven_id, target_equipment_name, oven_substeps):
+        """Create a CookStep for a specific oven and append it to the plan."""
+        cook = CookStep(
+            description=f"{step.description} ({target_equipment_name} #{oven_id})",
+            substeps=oven_substeps[oven_id],
+        )
+        self.plan.append(cook)
+
+    def _fire_cooking_wait(self, duration, duration_unit, oven_id, target_equipment_name, substeps_list):
+        """Assert a cooking_wait_request and fire the start_cooking rule for a given oven."""
+        cooking_request = Fact(
+            fact_title='cooking_wait_request',
+            target_equipment_name=target_equipment_name,
+            target_equipment_id=oven_id,
+            duration=duration,
+            duration_unit=duration_unit,
+        )
+        self.working_memory.add_fact(fact=cooking_request, indent="    ")
+
+        matches = self._find_matching_rules(cooking_request)
+        if matches:
+            best_rule, best_bindings = self._resolve_conflict(matches)
+            derived = self._fire_rule(best_rule, best_bindings, plan_override=substeps_list)
+
+            if self.verbose:
+                print(f"    [Rule fired] {best_rule.rule_name}")
+                if derived is not None:
+                    print(f"    [Derived] {derived}")
+
     def _resolve_equipment(self, equipment_need):
         """Resolve required_count pieces of equipment, returning a list or None on failure."""
         equipment_name = equipment_need.get('equipment_name')
@@ -568,10 +888,11 @@ class PlanningEngine:
                 new_attrs[key] = value
         return Fact(fact_title=fact_template.fact_title, **new_attrs)
 
-    def _fire_rule(self, rule, bindings):
+    def _fire_rule(self, rule, bindings, plan_override=None):
         """Fire a rule: run action_fn if present, then derive consequent if present."""
         if rule.action_fn:
-            bindings = rule.action_fn(bindings=bindings, wm=self.working_memory, kb=self.knowledge_base, plan=self.plan)
+            target_plan = plan_override if plan_override is not None else self.plan
+            bindings = rule.action_fn(bindings=bindings, wm=self.working_memory, kb=self.knowledge_base, plan=target_plan)
 
         # Skip consequent if action_fn signaled an error
         if '?error' in bindings:
