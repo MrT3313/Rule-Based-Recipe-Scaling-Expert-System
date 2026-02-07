@@ -102,6 +102,7 @@ def calculate_optimal_unit(*, bindings, wm, kb):
 
     if current_unit in SMALL_UNITS:
         return {
+            **bindings,
             '?optimal_components': [{'amount': scaled_amount, 'unit': current_unit}],
             '?original_amount': scaled_amount
         }
@@ -117,6 +118,7 @@ def calculate_optimal_unit(*, bindings, wm, kb):
     components = break_down_to_clean_units(base_amount=base_amount, unit_conversions=unit_conversions, measurement_type=measurement_type)
 
     return {
+        **bindings,
         '?optimal_components': components,
         '?original_amount': scaled_amount
     }

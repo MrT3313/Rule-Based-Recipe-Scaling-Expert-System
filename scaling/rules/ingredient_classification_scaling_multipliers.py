@@ -32,6 +32,7 @@ def get_ingredient_classification_scaling_multiplier_rules():
                            scaling_multiplier='?scaling_multiplier'),
             # action function to calculate ingredient scaling multiplier based on consequent bindings
             action_fn=lambda *, bindings, wm, kb: {
+                **bindings,
                 '?scaling_multiplier': bindings['?target_scale'] * bindings['?scale_factor']
             },
         )

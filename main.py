@@ -71,4 +71,4 @@ if __name__ == "__main__":
     wm = WorkingMemory()
 
     scaling.main.main(wm=wm, kb=kb, recipe=recipe, args=args)
-    planning.main.main(wm=wm, kb=kb, recipe=recipe, args=args)
+    # planning.main.main(wm=wm, kb=kb, recipe=recipe, args=args)
