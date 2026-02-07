@@ -38,7 +38,11 @@ def get_equipment_status_rules():
                      equipment_name='?equipment_name', equipment_id='?equipment_id'),
             ],
             action_fn=_clean_equipment,
-            consequent=None,
+            consequent=Fact(
+                fact_title='equipment_cleaned',
+                equipment_name='?equipment_name',
+                equipment_id='?equipment_id',
+            ),
         )
     )
 

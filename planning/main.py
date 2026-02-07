@@ -16,6 +16,12 @@ from planning.rules.equipment_transfer_rules import get_equipment_transfer_rules
 from planning.rules.cooking_rules import get_cooking_rules
 from planning.rules.removal_rules import get_removal_rules
 from planning.rules.step_dispatch_rules import get_step_dispatch_rules
+from planning.rules.mixing_dispatch_rules import get_mixing_dispatch_rules
+from planning.rules.transfer_dispatch_rules import get_transfer_dispatch_rules
+from planning.rules.removal_dispatch_rules import get_removal_dispatch_rules
+from planning.rules.surface_transfer_dispatch_rules import get_surface_transfer_dispatch_rules
+from planning.rules.equipment_transfer_dispatch_rules import get_equipment_transfer_dispatch_rules
+from planning.rules.cook_dispatch_rules import get_cook_dispatch_rules
 
 # reference facts
 from scaling.facts.measurement_unit_conversions import get_measurement_unit_conversion_facts
@@ -103,6 +109,30 @@ def main(*, wm, kb, recipe, args):
     step_dispatch_rules = get_step_dispatch_rules()
     kb.add_rules(rules=step_dispatch_rules)
     print(f"Added {len(step_dispatch_rules)} step dispatch rules")
+
+    mixing_dispatch_rules = get_mixing_dispatch_rules()
+    kb.add_rules(rules=mixing_dispatch_rules)
+    print(f"Added {len(mixing_dispatch_rules)} mixing dispatch rules")
+
+    transfer_dispatch_rules = get_transfer_dispatch_rules()
+    kb.add_rules(rules=transfer_dispatch_rules)
+    print(f"Added {len(transfer_dispatch_rules)} transfer dispatch rules")
+
+    removal_dispatch_rules = get_removal_dispatch_rules()
+    kb.add_rules(rules=removal_dispatch_rules)
+    print(f"Added {len(removal_dispatch_rules)} removal dispatch rules")
+
+    surface_transfer_dispatch_rules = get_surface_transfer_dispatch_rules()
+    kb.add_rules(rules=surface_transfer_dispatch_rules)
+    print(f"Added {len(surface_transfer_dispatch_rules)} surface transfer dispatch rules")
+
+    equipment_transfer_dispatch_rules = get_equipment_transfer_dispatch_rules()
+    kb.add_rules(rules=equipment_transfer_dispatch_rules)
+    print(f"Added {len(equipment_transfer_dispatch_rules)} equipment transfer dispatch rules")
+
+    cook_dispatch_rules = get_cook_dispatch_rules()
+    kb.add_rules(rules=cook_dispatch_rules)
+    print(f"Added {len(cook_dispatch_rules)} cook dispatch rules")
 
     unit_conversion_facts = get_measurement_unit_conversion_facts()
     kb.add_reference_fact(fact=unit_conversion_facts)

@@ -3,6 +3,8 @@ from planning.classes.TransferStep import TransferStep
 
 class TransferItem(TransferStep):
     """Transfer items between equipment (e.g., scoop dough onto sheet, cookies to cooling rack)."""
+    step_type = 'TRANSFER_ITEM'
+
     def __init__(self, *, description, required_equipment=[], substeps=[], is_passive=False,
                  source_equipment_name, target_equipment_name,
                  scoop_size_amount, scoop_size_unit):

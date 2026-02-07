@@ -11,6 +11,12 @@ from planning.engine import PlanningEngine
 from planning.rules.equipment_status import get_equipment_status_rules
 from planning.rules.ingredient_rules import get_ingredient_rules
 from planning.rules.step_dispatch_rules import get_step_dispatch_rules
+from planning.rules.mixing_dispatch_rules import get_mixing_dispatch_rules
+from planning.rules.transfer_dispatch_rules import get_transfer_dispatch_rules
+from planning.rules.removal_dispatch_rules import get_removal_dispatch_rules
+from planning.rules.surface_transfer_dispatch_rules import get_surface_transfer_dispatch_rules
+from planning.rules.equipment_transfer_dispatch_rules import get_equipment_transfer_dispatch_rules
+from planning.rules.cook_dispatch_rules import get_cook_dispatch_rules
 from scaling.facts.measurement_unit_conversions import get_measurement_unit_conversion_facts
 
 
@@ -31,6 +37,12 @@ def _make_engine(*, bowl_volume=4, bowl_volume_unit='QUARTS', ingredients, subst
     kb.add_rules(rules=get_equipment_status_rules())
     kb.add_rules(rules=get_ingredient_rules())
     kb.add_rules(rules=get_step_dispatch_rules())
+    kb.add_rules(rules=get_mixing_dispatch_rules())
+    kb.add_rules(rules=get_transfer_dispatch_rules())
+    kb.add_rules(rules=get_removal_dispatch_rules())
+    kb.add_rules(rules=get_surface_transfer_dispatch_rules())
+    kb.add_rules(rules=get_equipment_transfer_dispatch_rules())
+    kb.add_rules(rules=get_cook_dispatch_rules())
     kb.add_reference_fact(fact=get_measurement_unit_conversion_facts())
 
     recipe = Recipe(

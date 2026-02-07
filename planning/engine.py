@@ -1,10 +1,5 @@
 from classes.Fact import Fact
-from planning.classes.MixingStep import MixingStep
-from planning.classes.TransferStep import TransferStep
-from planning.classes.TransferEquipment import TransferEquipment
-from planning.classes.TransferItem import TransferItem
-from planning.classes.CookStep import CookStep
-from planning.classes.WaitStep import WaitStep
+from classes.NegatedFact import NegatedFact
 
 
 class PlanningEngine:
@@ -44,14 +39,19 @@ class PlanningEngine:
             self.working_memory.add_fact(fact=step_request)
 
             # Forward-chain: orchestration rules handle dispatch + execution
-            self._forward_chain(step_request)
+            step_type = step_request.attributes['step_type']
+            rule_fired, _ = self._forward_chain(step_request)
 
             # Error check
             if self.last_error:
                 return (False, self.last_error)
 
+            # Check that a non-GENERIC step was handled by at least one rule
+            if step_type != 'GENERIC' and not rule_fired:
+                return (False, f"No rule matched for step {idx}: {step_type} ({step.description})")
+
             # For generic steps (no dispatch rule matched), handle directly
-            if step_request.attributes['step_type'] == 'GENERIC':
+            if step_type == 'GENERIC':
                 # Transition resolved equipment from RESERVED -> IN_USE
                 for eq in resolved_equipment:
                     eq.attributes['state'] = 'IN_USE'
@@ -63,51 +63,19 @@ class PlanningEngine:
 
     def _build_step_request(self, step, step_idx, resolved_equipment):
         """Convert a recipe Step object to a step_request Fact for rule-based dispatch.
-        This is the ONE place where isinstance is used — at the boundary between
-        the recipe domain model (Python objects) and the rule system (facts)."""
+        Uses step_type class attribute for base classification, with attribute-based
+        overrides for context-dependent types (EQUIPMENT_REMOVAL, ITEM_TRANSFER_TO_SURFACE)."""
 
-        # Equipment removal: TransferEquipment where source is not BAKING_SHEET
-        if isinstance(step, TransferEquipment) and step.source_equipment_name != 'BAKING_SHEET':
-            return Fact(
-                fact_title='step_request',
-                step_type='EQUIPMENT_REMOVAL',
-                step_idx=step_idx,
-            )
+        base_type = getattr(step, 'step_type', 'GENERIC')
 
-        # Item transfer to SURFACE equipment (e.g., BAKING_SHEET -> COOLING_RACK)
-        if isinstance(step, TransferItem) and step.target_equipment_name == 'COOLING_RACK':
-            return Fact(
-                fact_title='step_request',
-                step_type='ITEM_TRANSFER_TO_SURFACE',
-                step_idx=step_idx,
-            )
+        # Attribute-based overrides for context-dependent classification
+        if base_type == 'TRANSFER_EQUIPMENT' and step.source_equipment_name != 'BAKING_SHEET':
+            base_type = 'EQUIPMENT_REMOVAL'
+        elif base_type == 'TRANSFER_ITEM' and step.target_equipment_name == 'COOLING_RACK':
+            base_type = 'ITEM_TRANSFER_TO_SURFACE'
 
-        # TransferItem (e.g., scoop dough onto baking sheets)
-        if isinstance(step, TransferItem):
-            return Fact(
-                fact_title='step_request',
-                step_type='TRANSFER_ITEM',
-                step_idx=step_idx,
-            )
-
-        # TransferEquipment (e.g., sheet -> oven)
-        if isinstance(step, TransferEquipment):
-            return Fact(
-                fact_title='step_request',
-                step_type='TRANSFER_EQUIPMENT',
-                step_idx=step_idx,
-            )
-
-        # CookStep
-        if isinstance(step, CookStep):
-            return Fact(
-                fact_title='step_request',
-                step_type='COOK',
-                step_idx=step_idx,
-            )
-
-        # MixingStep
-        if isinstance(step, MixingStep):
+        # MIXING needs extra equipment info in the step_request
+        if base_type == 'MIXING':
             target_equipment = None
             for eq in resolved_equipment:
                 if eq.attributes.get('equipment_type') == 'CONTAINER':
@@ -141,25 +109,69 @@ class PlanningEngine:
                 equipment_volume_unit=target_equipment.attributes.get('volume_unit', ''),
             )
 
-        # Generic step (no special handling needed)
         return Fact(
             fact_title='step_request',
-            step_type='GENERIC',
+            step_type=base_type,
             step_idx=step_idx,
         )
 
     def _forward_chain(self, trigger_fact):
         """Find matching rules for a trigger fact, resolve conflict, fire via DFS.
-        Returns the derived fact (or None). Sets self.last_error on failure."""
+        Uses a while-loop to exhaust all matches for the trigger (e.g., T1 fires
+        once per mixed_contents source). Returns (rule_fired, last_derived_fact).
+        Sets self.last_error on failure."""
+        last_derived = None
+        any_rule_fired = False
+        fired = set()
+
         matches = self._find_matching_rules(trigger_fact)
-        if not matches:
-            return None
-        best_rule, best_bindings = self._resolve_conflict(matches)
-        self._last_bindings = best_bindings
-        derived = self._fire_rule_dfs(best_rule, best_bindings)
-        if '?error' in best_bindings:
-            self.last_error = best_bindings['?error']
-        return derived
+        while matches:
+            if self.last_error:
+                break
+
+            wm_size = len(self.working_memory.facts)
+
+            # Filter out already-fired matches
+            fresh = []
+            for m_rule, m_bindings in matches:
+                binding_key = frozenset(
+                    (k, v) for k, v in m_bindings.items()
+                    if isinstance(k, str) and k.startswith('?')
+                )
+                has_negated = any(
+                    isinstance(a, NegatedFact) for a in m_rule.antecedents
+                )
+                if has_negated:
+                    key = (m_rule.rule_name, wm_size, binding_key)
+                else:
+                    key = (m_rule.rule_name, binding_key)
+                if key not in fired:
+                    fresh.append((m_rule, m_bindings, key))
+            if not fresh:
+                break
+
+            best_idx = max(
+                range(len(fresh)),
+                key=lambda i: fresh[i][0].priority,
+            )
+            best_rule, best_bindings, fire_key = fresh[best_idx]
+            fired.add(fire_key)
+
+            self._last_bindings = best_bindings
+            any_rule_fired = True
+            derived = self._fire_rule_dfs(best_rule, best_bindings)
+            if '?error' in best_bindings:
+                self.last_error = best_bindings['?error']
+            if derived is not None:
+                last_derived = derived
+
+            if self.last_error:
+                break
+
+            # Re-evaluate: new facts may have changed what matches
+            matches = self._find_matching_rules(trigger_fact)
+
+        return (any_rule_fired, last_derived)
 
     def _resolve_equipment(self, equipment_need):
         """Resolve required_count pieces of equipment, returning a list or None on failure."""
@@ -203,21 +215,65 @@ class PlanningEngine:
 
         return resolved
 
-    def _find_matching_rules(self, fact):
-        """Return all (rule, bindings) pairs whose antecedents match the given fact."""
+    def _match_antecedents(self, antecedents, bindings):
+        """Recursively match a list of antecedents against ALL facts in WM + KB.
+        Returns all valid binding sets. Handles NegatedFact via negation-as-failure."""
+        if not antecedents:
+            return [bindings]
+
+        first = antecedents[0]
+        rest = antecedents[1:]
+        all_facts = self.working_memory.facts
+
+        if isinstance(first, NegatedFact):
+            pattern = first.fact
+            for fact in all_facts:
+                if self._unify(pattern, fact, bindings) is not None:
+                    return []
+            return self._match_antecedents(rest, bindings)
+
+        results = []
+        for fact in all_facts:
+            new_bindings = self._unify(first, fact, bindings)
+            if new_bindings is not None:
+                sub_results = self._match_antecedents(rest, new_bindings)
+                results.extend(sub_results)
+        return results
+
+    def _find_matching_rules(self, trigger_fact):
+        """Return all (rule, bindings) pairs whose antecedents are satisfied.
+        Uses trigger_fact as a cheap filter: only consider rules where at least one
+        positive antecedent unifies with the trigger. Then do full multi-antecedent
+        matching, but anchor one antecedent to the trigger fact specifically."""
         matches = []
         for rule in self.knowledge_base.rules:
-            bindings = {}
-            all_matched = True
-            for antecedent in rule.antecedents:
-                result = self._unify(antecedent, fact, bindings)
-                if result is None:
-                    all_matched = False
-                    break
-                bindings = result
-            if all_matched:
-                matches.append((rule, bindings))
+            # Find which positive antecedent(s) unify with trigger_fact
+            for ant_idx, antecedent in enumerate(rule.antecedents):
+                if isinstance(antecedent, NegatedFact):
+                    continue
+
+                initial_bindings = self._unify(antecedent, trigger_fact, {})
+                if initial_bindings is None:
+                    continue
+
+                # Anchor: this antecedent MUST bind to trigger_fact.
+                # Match remaining antecedents against all WM facts.
+                remaining = rule.antecedents[:ant_idx] + rule.antecedents[ant_idx + 1:]
+                bindings_list = self._match_antecedents(remaining, initial_bindings)
+                for bindings in bindings_list:
+                    # Deduplicate: avoid adding the same bindings twice
+                    if (rule, bindings) not in matches:
+                        matches.append((rule, bindings))
+                break  # Only anchor to first matching antecedent per rule
+
         return matches
+
+    def _fact_exists(self, fact):
+        """Check if an identical fact is already in working memory."""
+        for existing in self.working_memory.facts:
+            if existing.fact_title == fact.fact_title and existing.attributes == fact.attributes:
+                return True
+        return False
 
     def _unify(self, pattern, fact, bindings):
         """Try to match one antecedent pattern against one fact.
@@ -262,7 +318,9 @@ class PlanningEngine:
 
     def _fire_rule_dfs(self, rule, bindings, plan_override=None):
         """Fire a rule: run action_fn if present, then derive consequent if present.
-        DFS: if the derived fact triggers further rules, fire them recursively."""
+        DFS: if the derived fact triggers further rules, fire them recursively.
+        After DFS chaining on a consequent, re-evaluate matches for the derived fact
+        to enable data-driven iteration (e.g., processing multiple pending_ingredient facts)."""
         if rule.action_fn:
             target_plan = plan_override if plan_override is not None else self.plan
             bindings['_engine'] = self  # orchestration rules use this
@@ -270,17 +328,62 @@ class PlanningEngine:
 
         # Skip consequent if action_fn signaled an error
         if '?error' in bindings:
+            self.last_error = bindings['?error']
             return None
 
         if rule.consequent is not None:
             derived = self._apply_bindings(rule.consequent, bindings)
-            self.working_memory.add_fact(fact=derived)
+            if not self._fact_exists(derived):
+                self.working_memory.add_fact(fact=derived)
 
-            # DFS: check if derived fact triggers further rules
+            # DFS: check if derived fact triggers further rules.
+            # Track fired (rule_name, bindings) to prevent re-firing the same match.
+            # Rules with NegatedFact antecedents can re-fire with same bindings when
+            # WM changes (the negated guard may flip), so include wm_size in their key.
+            fired = set()
             chain_matches = self._find_matching_rules(derived)
-            if chain_matches:
-                best_chain_rule, best_chain_bindings = self._resolve_conflict(chain_matches)
+            while chain_matches:
+                if self.last_error:
+                    break
+
+                wm_size = len(self.working_memory.facts)
+
+                # Filter out already-fired matches
+                fresh = []
+                for m_rule, m_bindings in chain_matches:
+                    binding_key = frozenset(
+                        (k, v) for k, v in m_bindings.items()
+                        if isinstance(k, str) and k.startswith('?')
+                    )
+                    # Rules with NegatedFact guards may validly re-fire when WM
+                    # changes (e.g., T2 iterates sheets via NOT all_sheets_transferred).
+                    # Include wm_size so new WM state = fresh firing chance.
+                    has_negated = any(
+                        isinstance(a, NegatedFact) for a in m_rule.antecedents
+                    )
+                    if has_negated:
+                        key = (m_rule.rule_name, wm_size, binding_key)
+                    else:
+                        key = (m_rule.rule_name, binding_key)
+                    if key not in fired:
+                        fresh.append((m_rule, m_bindings, key))
+                if not fresh:
+                    break
+
+                best_idx = max(
+                    range(len(fresh)),
+                    key=lambda i: fresh[i][0].priority,
+                )
+                best_chain_rule, best_chain_bindings, fire_key = fresh[best_idx]
+                fired.add(fire_key)
+
                 self._fire_rule_dfs(best_chain_rule, best_chain_bindings, plan_override=plan_override)
+
+                if self.last_error:
+                    break
+
+                # Re-evaluate: new facts may enable new matches for the derived trigger
+                chain_matches = self._find_matching_rules(derived)
 
             return derived
 
