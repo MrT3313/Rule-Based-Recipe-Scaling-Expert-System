@@ -17,6 +17,7 @@ from planning.rules.ingredient_rules import get_ingredient_rules
 from planning.rules.transfer_rules import get_transfer_rules
 from planning.rules.equipment_transfer_rules import get_equipment_transfer_rules
 from planning.rules.cooking_rules import get_cooking_rules
+from planning.rules.step_dispatch_rules import get_step_dispatch_rules
 from scaling.facts.measurement_unit_conversions import get_measurement_unit_conversion_facts
 from planning.facts.transfer_reference_facts import get_transfer_reference_facts
 
@@ -62,6 +63,7 @@ def _make_engine(*, ingredients, substeps, bowl_volume=4, bowl_volume_unit='QUAR
     kb.add_rules(rules=get_transfer_rules())
     kb.add_rules(rules=get_equipment_transfer_rules())
     kb.add_rules(rules=get_cooking_rules())
+    kb.add_rules(rules=get_step_dispatch_rules())
     kb.add_reference_fact(fact=get_measurement_unit_conversion_facts())
     kb.add_reference_fact(fact=get_transfer_reference_facts())
 

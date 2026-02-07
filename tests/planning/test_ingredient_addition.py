@@ -10,6 +10,7 @@ from planning.classes.MixingSubstep import MixingSubstep
 from planning.engine import PlanningEngine
 from planning.rules.equipment_status import get_equipment_status_rules
 from planning.rules.ingredient_rules import get_ingredient_rules
+from planning.rules.step_dispatch_rules import get_step_dispatch_rules
 from scaling.facts.measurement_unit_conversions import get_measurement_unit_conversion_facts
 
 
@@ -29,6 +30,7 @@ def _make_engine(*, bowl_volume=4, bowl_volume_unit='QUARTS', ingredients, subst
     kb = KnowledgeBase()
     kb.add_rules(rules=get_equipment_status_rules())
     kb.add_rules(rules=get_ingredient_rules())
+    kb.add_rules(rules=get_step_dispatch_rules())
     kb.add_reference_fact(fact=get_measurement_unit_conversion_facts())
 
     recipe = Recipe(

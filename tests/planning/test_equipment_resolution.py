@@ -8,6 +8,7 @@ from planning.classes.CleaningStep import CleaningStep
 from planning.classes.Step import Step
 from planning.engine import PlanningEngine
 from planning.rules.equipment_status import get_equipment_status_rules
+from planning.rules.step_dispatch_rules import get_step_dispatch_rules
 
 
 def _make_oven_engine(state):
@@ -25,6 +26,7 @@ def _make_oven_engine(state):
 
     kb = KnowledgeBase()
     kb.add_rules(rules=get_equipment_status_rules())
+    kb.add_rules(rules=get_step_dispatch_rules())
 
     recipe = Recipe(
         name='Test Recipe',
@@ -87,6 +89,7 @@ def _make_bowl_engine(states):
 
     kb = KnowledgeBase()
     kb.add_rules(rules=get_equipment_status_rules())
+    kb.add_rules(rules=get_step_dispatch_rules())
 
     recipe = Recipe(
         name='Test Recipe',

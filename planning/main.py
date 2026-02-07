@@ -15,6 +15,7 @@ from planning.rules.transfer_rules import get_transfer_rules
 from planning.rules.equipment_transfer_rules import get_equipment_transfer_rules
 from planning.rules.cooking_rules import get_cooking_rules
 from planning.rules.removal_rules import get_removal_rules
+from planning.rules.step_dispatch_rules import get_step_dispatch_rules
 
 # reference facts
 from scaling.facts.measurement_unit_conversions import get_measurement_unit_conversion_facts
@@ -98,6 +99,10 @@ def main(*, wm, kb, recipe, args):
     removal_rules = get_removal_rules()
     kb.add_rules(rules=removal_rules)
     print(f"Added {len(removal_rules)} removal rules")
+
+    step_dispatch_rules = get_step_dispatch_rules()
+    kb.add_rules(rules=step_dispatch_rules)
+    print(f"Added {len(step_dispatch_rules)} step dispatch rules")
 
     unit_conversion_facts = get_measurement_unit_conversion_facts()
     kb.add_reference_fact(fact=unit_conversion_facts)

@@ -15,6 +15,7 @@ from planning.rules.equipment_status import get_equipment_status_rules
 from planning.rules.ingredient_rules import get_ingredient_rules
 from planning.rules.transfer_rules import get_transfer_rules
 from planning.rules.equipment_transfer_rules import get_equipment_transfer_rules
+from planning.rules.step_dispatch_rules import get_step_dispatch_rules
 from scaling.facts.measurement_unit_conversions import get_measurement_unit_conversion_facts
 from planning.facts.transfer_reference_facts import get_transfer_reference_facts
 
@@ -61,6 +62,7 @@ def _make_engine(*, ingredients, substeps, bowl_volume=4, bowl_volume_unit='QUAR
     kb.add_rules(rules=get_transfer_rules())
     if include_equipment_transfer:
         kb.add_rules(rules=get_equipment_transfer_rules())
+    kb.add_rules(rules=get_step_dispatch_rules())
     kb.add_reference_fact(fact=get_measurement_unit_conversion_facts())
     kb.add_reference_fact(fact=get_transfer_reference_facts())
 
@@ -133,6 +135,7 @@ def _make_two_bowl_engine(*, ingredients, substeps_bowl1, substeps_bowl2,
     kb.add_rules(rules=get_equipment_status_rules())
     kb.add_rules(rules=get_ingredient_rules())
     kb.add_rules(rules=get_transfer_rules())
+    kb.add_rules(rules=get_step_dispatch_rules())
     kb.add_reference_fact(fact=get_measurement_unit_conversion_facts())
     kb.add_reference_fact(fact=get_transfer_reference_facts())
 
@@ -493,6 +496,7 @@ class TestTransferFailures:
         kb.add_rules(rules=get_equipment_status_rules())
         kb.add_rules(rules=get_ingredient_rules())
         kb.add_rules(rules=get_transfer_rules())
+        kb.add_rules(rules=get_step_dispatch_rules())
         kb.add_reference_fact(fact=get_measurement_unit_conversion_facts())
         kb.add_reference_fact(fact=get_transfer_reference_facts())
 
