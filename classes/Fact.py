@@ -4,6 +4,7 @@ class Fact:
         self.attributes = attributes
 
         self.fact_id = None
+        self.derivation = None
 
     def __repr__(self):
         attrs = ', '.join(f"{k}={v}" for k, v in self.attributes.items())

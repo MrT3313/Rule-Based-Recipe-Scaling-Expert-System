@@ -236,6 +236,7 @@ class PlanningEngine:
         for fact in all_facts:
             new_bindings = self._unify(first, fact, bindings)
             if new_bindings is not None:
+                new_bindings['_matched_facts'] = bindings.get('_matched_facts', []) + [fact]
                 sub_results = self._match_antecedents(rest, new_bindings)
                 results.extend(sub_results)
         return results
@@ -255,6 +256,8 @@ class PlanningEngine:
                 initial_bindings = self._unify(antecedent, trigger_fact, {})
                 if initial_bindings is None:
                     continue
+
+                initial_bindings['_matched_facts'] = [trigger_fact]
 
                 # Anchor: this antecedent MUST bind to trigger_fact.
                 # Match remaining antecedents against all WM facts.
@@ -321,6 +324,11 @@ class PlanningEngine:
         DFS: if the derived fact triggers further rules, fire them recursively.
         After DFS chaining on a consequent, re-evaluate matches for the derived fact
         to enable data-driven iteration (e.g., processing multiple pending_ingredient facts)."""
+        matched_facts = bindings.get('_matched_facts', [])
+        derivation = {'rule_name': rule.rule_name, 'antecedent_facts': list(matched_facts)}
+        prev_derivation = self.working_memory._current_derivation
+        self.working_memory._current_derivation = derivation
+
         if rule.action_fn:
             target_plan = plan_override if plan_override is not None else self.plan
             bindings['_engine'] = self  # orchestration rules use this
@@ -329,12 +337,16 @@ class PlanningEngine:
         # Skip consequent if action_fn signaled an error
         if '?error' in bindings:
             self.last_error = bindings['?error']
+            self.working_memory._current_derivation = prev_derivation
             return None
 
         if rule.consequent is not None:
             derived = self._apply_bindings(rule.consequent, bindings)
             if not self._fact_exists(derived):
+                derived.derivation = derivation
                 self.working_memory.add_fact(fact=derived)
+
+            self.working_memory._current_derivation = prev_derivation
 
             # DFS: check if derived fact triggers further rules.
             # Track fired (rule_name, bindings) to prevent re-firing the same match.
@@ -387,6 +399,7 @@ class PlanningEngine:
 
             return derived
 
+        self.working_memory._current_derivation = prev_derivation
         return None
 
     def _resolve_conflict(self, matches):

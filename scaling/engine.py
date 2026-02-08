@@ -85,6 +85,8 @@ class ScalingEngine:
                 if initial_bindings is None:
                     continue
 
+                initial_bindings['_matched_facts'] = [trigger_fact]
+
                 # Anchor: this antecedent binds to trigger_fact.
                 # Match remaining antecedents against all KB + WM facts.
                 remaining = rule.antecedents[:ant_idx] + rule.antecedents[ant_idx + 1:]
@@ -117,6 +119,7 @@ class ScalingEngine:
         for fact in all_facts:
             new_bindings = self._unify(first, fact, bindings)
             if new_bindings is not None:
+                new_bindings['_matched_facts'] = bindings.get('_matched_facts', []) + [fact]
                 sub_results = self._match_antecedents(rest, new_bindings)
                 results.extend(sub_results)
         return results
@@ -178,16 +181,24 @@ class ScalingEngine:
         """Fire a rule: run action_fn if present, then derive consequent.
         DFS: if the derived fact triggers further rules, fire them recursively
         via a while-loop with explicit fired-set tracking."""
+        matched_facts = bindings.get('_matched_facts', [])
+        derivation = {'rule_name': rule.rule_name, 'antecedent_facts': list(matched_facts)}
+        prev_derivation = self.working_memory._current_derivation
+        self.working_memory._current_derivation = derivation
+
         if rule.action_fn:
             bindings = rule.action_fn(bindings=bindings, wm=self.working_memory, kb=self.knowledge_base)
 
         if rule.consequent is not None:
             derived = self._apply_bindings(rule.consequent, bindings)
             if not self._fact_exists(derived):
+                derived.derivation = derivation
                 self.working_memory.add_fact(fact=derived, silent=not self.verbose)
 
                 if self.verbose:
                     print(f"[Rule fired] {rule.rule_name} -> {derived}")
+
+            self.working_memory._current_derivation = prev_derivation
 
             # DFS: chase rules triggered by the derived fact
             fired = set()
@@ -222,4 +233,5 @@ class ScalingEngine:
 
             return derived
 
+        self.working_memory._current_derivation = prev_derivation
         return None

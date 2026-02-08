@@ -2,9 +2,12 @@ class WorkingMemory:
     def __init__(self):
         self.facts = []
         self.next_fact_id = 1
+        self._current_derivation = None
 
     def add_fact(self, *, fact, indent="", silent=False):
         fact.set_fact_id(fact_id=self.next_fact_id)
+        if fact.derivation is None and self._current_derivation is not None:
+            fact.derivation = self._current_derivation
         self.facts.append(fact)
         self.next_fact_id += 1
         if not silent:

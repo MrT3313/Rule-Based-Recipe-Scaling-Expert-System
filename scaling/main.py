@@ -1,5 +1,6 @@
 from scaling.engine import ScalingEngine
 from classes.Fact import Fact
+from classes.ExplanationFacility import ExplanationFacility
 
 from scaling.facts.ingredient_classifications import get_ingredient_classification_facts
 from scaling.facts.ingredient_classification_scale_factors import get_ingredient_classification_scale_factor_facts
@@ -163,3 +164,7 @@ def main(*, wm, kb, recipe, args):
     for fact in wm.facts:
         print(f"  #{fact.fact_id}  {fact}")
     print("")
+
+    if args.explain:
+        explanation = ExplanationFacility(wm=wm, kb=kb, label="Scaling")
+        explanation.run_repl()

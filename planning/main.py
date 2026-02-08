@@ -1,6 +1,7 @@
 # classes
 from planning.engine import PlanningEngine
 from classes.Fact import Fact
+from classes.ExplanationFacility import ExplanationFacility
 from planning.classes.MixingStep import MixingStep
 from planning.classes.CookStep import CookStep
 from planning.classes.WaitStep import WaitStep
@@ -155,6 +156,10 @@ def main(*, wm, kb, recipe, args):
     else:
         print(f"\n✅ Planning complete — {len(result)} action(s) in plan")
         print_plan(result)
+
+    if args.explain:
+        explanation = ExplanationFacility(wm=wm, kb=kb, label="Planning")
+        explanation.run_repl()
 
     return success, result
 
