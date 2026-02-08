@@ -44,11 +44,11 @@ def _make_engine(*, ingredients, scale_factor=2.0):
     return ScalingEngine(wm=wm, kb=kb, verbose=False)
 
 
-def _count_facts(engine, title):
+def _count_facts(*, engine, title):
     return len([f for f in engine.working_memory.facts if f.fact_title == title])
 
 
-def _get_fact(engine, title, ingredient_name):
+def _get_fact(*, engine, title, ingredient_name):
     matches = [
         f for f in engine.working_memory.facts
         if f.fact_title == title and f.attributes.get('ingredient_name') == ingredient_name
@@ -66,17 +66,17 @@ class TestFullPipelineSingleIngredient:
             {'name': 'SALT', 'amount': 1, 'unit': 'TEASPOONS', 'measurement_category': 'VOLUME'},
         ])
         engine.run()
-        assert _count_facts(engine, 'classified_ingredient') == 1
-        assert _count_facts(engine, 'ingredient_scaling_multiplier') == 1
-        assert _count_facts(engine, 'scaled_ingredient') == 1
-        assert _count_facts(engine, 'optimally_scaled_ingredient') == 1
+        assert _count_facts(engine=engine, title='classified_ingredient') == 1
+        assert _count_facts(engine=engine, title='ingredient_scaling_multiplier') == 1
+        assert _count_facts(engine=engine, title='scaled_ingredient') == 1
+        assert _count_facts(engine=engine, title='optimally_scaled_ingredient') == 1
 
     def test_classified_values(self):
         engine = _make_engine(ingredients=[
             {'name': 'SALT', 'amount': 1, 'unit': 'TEASPOONS', 'measurement_category': 'VOLUME'},
         ])
         engine.run()
-        fact = _get_fact(engine, 'classified_ingredient', 'SALT')
+        fact = _get_fact(engine=engine, title='classified_ingredient', ingredient_name='SALT')
         assert fact.attributes['classification'] == 'SEASONING'
 
     def test_multiplier_values(self):
@@ -84,7 +84,7 @@ class TestFullPipelineSingleIngredient:
             {'name': 'SALT', 'amount': 1, 'unit': 'TEASPOONS', 'measurement_category': 'VOLUME'},
         ])
         engine.run()
-        fact = _get_fact(engine, 'ingredient_scaling_multiplier', 'SALT')
+        fact = _get_fact(engine=engine, title='ingredient_scaling_multiplier', ingredient_name='SALT')
         assert fact.attributes['scaling_multiplier'] == pytest.approx(1.6)
 
     def test_scaled_values(self):
@@ -92,7 +92,7 @@ class TestFullPipelineSingleIngredient:
             {'name': 'SALT', 'amount': 1, 'unit': 'TEASPOONS', 'measurement_category': 'VOLUME'},
         ])
         engine.run()
-        fact = _get_fact(engine, 'scaled_ingredient', 'SALT')
+        fact = _get_fact(engine=engine, title='scaled_ingredient', ingredient_name='SALT')
         assert fact.attributes['scaled_amount'] == pytest.approx(1.6)
         assert fact.attributes['original_amount'] == 1
 
@@ -101,7 +101,7 @@ class TestFullPipelineSingleIngredient:
             {'name': 'SALT', 'amount': 1, 'unit': 'TEASPOONS', 'measurement_category': 'VOLUME'},
         ])
         engine.run()
-        fact = _get_fact(engine, 'optimally_scaled_ingredient', 'SALT')
+        fact = _get_fact(engine=engine, title='optimally_scaled_ingredient', ingredient_name='SALT')
         assert fact.attributes['components'] is not None
         assert len(fact.attributes['components']) >= 1
 
@@ -125,22 +125,22 @@ class TestFullPipelineMultipleIngredients:
     def test_nine_classified(self):
         engine = _make_engine(ingredients=FULL_RECIPE)
         engine.run()
-        assert _count_facts(engine, 'classified_ingredient') == 9
+        assert _count_facts(engine=engine, title='classified_ingredient') == 9
 
     def test_nine_multipliers(self):
         engine = _make_engine(ingredients=FULL_RECIPE)
         engine.run()
-        assert _count_facts(engine, 'ingredient_scaling_multiplier') == 9
+        assert _count_facts(engine=engine, title='ingredient_scaling_multiplier') == 9
 
     def test_nine_scaled(self):
         engine = _make_engine(ingredients=FULL_RECIPE)
         engine.run()
-        assert _count_facts(engine, 'scaled_ingredient') == 9
+        assert _count_facts(engine=engine, title='scaled_ingredient') == 9
 
     def test_nine_optimal(self):
         engine = _make_engine(ingredients=FULL_RECIPE)
         engine.run()
-        assert _count_facts(engine, 'optimally_scaled_ingredient') == 9
+        assert _count_facts(engine=engine, title='optimally_scaled_ingredient') == 9
 
     def test_total_facts(self):
         """1 scale_factor + 9 ingredients + 9*4 derived = 46 total."""
@@ -157,13 +157,13 @@ class TestFullPipelineKnownVsDefault:
         engine = _make_engine(ingredients=FULL_RECIPE)
         engine.run()
 
-        salt_mult = _get_fact(engine, 'ingredient_scaling_multiplier', 'SALT')
+        salt_mult = _get_fact(engine=engine, title='ingredient_scaling_multiplier', ingredient_name='SALT')
         assert salt_mult.attributes['scaling_multiplier'] != pytest.approx(2.0)
 
-        soda_mult = _get_fact(engine, 'ingredient_scaling_multiplier', 'BAKING_SODA')
+        soda_mult = _get_fact(engine=engine, title='ingredient_scaling_multiplier', ingredient_name='BAKING_SODA')
         assert soda_mult.attributes['scaling_multiplier'] != pytest.approx(2.0)
 
-        vanilla_mult = _get_fact(engine, 'ingredient_scaling_multiplier', 'VANILLA_EXTRACT')
+        vanilla_mult = _get_fact(engine=engine, title='ingredient_scaling_multiplier', ingredient_name='VANILLA_EXTRACT')
         assert vanilla_mult.attributes['scaling_multiplier'] != pytest.approx(2.0)
 
     def test_default_ingredients_unit_multiplier(self):
@@ -172,7 +172,7 @@ class TestFullPipelineKnownVsDefault:
         engine.run()
 
         for name in ['ALL_PURPOSE_FLOUR', 'BUTTER', 'WHITE_SUGAR', 'BROWN_SUGAR', 'EGGS', 'CHOCOLATE_CHIPS']:
-            mult = _get_fact(engine, 'ingredient_scaling_multiplier', name)
+            mult = _get_fact(engine=engine, title='ingredient_scaling_multiplier', ingredient_name=name)
             assert mult.attributes['scaling_multiplier'] == pytest.approx(2.0), f"{name} should have 2.0"
 
 
@@ -185,7 +185,7 @@ class TestFullPipelineScaleFactorOne:
             {'name': 'BUTTER', 'amount': 1, 'unit': 'CUPS', 'measurement_category': 'VOLUME'},
         ], scale_factor=1.0)
         engine.run()
-        scaled = _get_fact(engine, 'scaled_ingredient', 'BUTTER')
+        scaled = _get_fact(engine=engine, title='scaled_ingredient', ingredient_name='BUTTER')
         assert scaled.attributes['scaled_amount'] == pytest.approx(1.0)
         assert scaled.attributes['original_amount'] == 1
 
@@ -198,7 +198,7 @@ class TestFullPipelineScaleFactorHalf:
             {'name': 'BUTTER', 'amount': 2, 'unit': 'CUPS', 'measurement_category': 'VOLUME'},
         ], scale_factor=0.5)
         engine.run()
-        scaled = _get_fact(engine, 'scaled_ingredient', 'BUTTER')
+        scaled = _get_fact(engine=engine, title='scaled_ingredient', ingredient_name='BUTTER')
         assert scaled.attributes['scaled_amount'] == pytest.approx(1.0)
 
     def test_half_scaling_known_ingredient(self):
@@ -207,7 +207,7 @@ class TestFullPipelineScaleFactorHalf:
             {'name': 'SALT', 'amount': 1, 'unit': 'TEASPOONS', 'measurement_category': 'VOLUME'},
         ], scale_factor=0.5)
         engine.run()
-        scaled = _get_fact(engine, 'scaled_ingredient', 'SALT')
+        scaled = _get_fact(engine=engine, title='scaled_ingredient', ingredient_name='SALT')
         assert scaled.attributes['scaled_amount'] == pytest.approx(0.4)
 
 
@@ -222,12 +222,12 @@ class TestFullPipelineTriggerChaining:
         triggers = [f for f in engine.working_memory.facts if f.fact_title == 'recipe_ingredient']
         assert len(triggers) == 1
 
-        rule_fired, last_derived = engine._forward_chain(triggers[0])
+        rule_fired, last_derived = engine._forward_chain(trigger_fact=triggers[0])
         assert rule_fired is True
-        assert _count_facts(engine, 'classified_ingredient') == 1
-        assert _count_facts(engine, 'ingredient_scaling_multiplier') == 1
-        assert _count_facts(engine, 'scaled_ingredient') == 1
-        assert _count_facts(engine, 'optimally_scaled_ingredient') == 1
+        assert _count_facts(engine=engine, title='classified_ingredient') == 1
+        assert _count_facts(engine=engine, title='ingredient_scaling_multiplier') == 1
+        assert _count_facts(engine=engine, title='scaled_ingredient') == 1
+        assert _count_facts(engine=engine, title='optimally_scaled_ingredient') == 1
 
     def test_run_matches_manual_forward_chain(self):
         """engine.run() should produce the same results as manual per-ingredient forward_chain."""
@@ -237,7 +237,7 @@ class TestFullPipelineTriggerChaining:
         engine_manual = _make_engine(ingredients=FULL_RECIPE)
         triggers = [f for f in engine_manual.working_memory.facts if f.fact_title == 'recipe_ingredient']
         for t in triggers:
-            engine_manual._forward_chain(t)
+            engine_manual._forward_chain(trigger_fact=t)
 
         # Both should have same number of facts
         assert len(engine_run.working_memory.facts) == len(engine_manual.working_memory.facts)
@@ -245,4 +245,4 @@ class TestFullPipelineTriggerChaining:
         # Both should have same derived fact counts
         for title in ['classified_ingredient', 'ingredient_scaling_multiplier',
                       'scaled_ingredient', 'optimally_scaled_ingredient']:
-            assert _count_facts(engine_run, title) == _count_facts(engine_manual, title)
+            assert _count_facts(engine=engine_run, title=title) == _count_facts(engine=engine_manual, title=title)

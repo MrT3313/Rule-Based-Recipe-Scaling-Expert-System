@@ -28,7 +28,7 @@ def _initialize_transfer(*, bindings, wm, kb, plan):
         target_equipment_name=step.target_equipment_name,
     )
     wm.add_fact(fact=planning_request, indent="  ")
-    _, derived = engine._forward_chain(planning_request)
+    _, derived = engine._forward_chain(trigger_fact=planning_request)
 
     if engine.last_error:
         bindings['?error'] = engine.last_error
@@ -96,7 +96,7 @@ def _allocate_next_sheet(*, bindings, wm, kb, plan):
 
     # Resolve one target sheet
     equipment_need = {'equipment_name': target_equipment_name, 'required_count': 1}
-    resolved_list = engine._resolve_equipment(equipment_need)
+    resolved_list = engine._resolve_equipment(equipment_need=equipment_need)
     if resolved_list is None:
         bindings['?error'] = f"Could not resolve {target_equipment_name} for sheet {sheets_done + 1}"
         return bindings
@@ -124,7 +124,7 @@ def _allocate_next_sheet(*, bindings, wm, kb, plan):
         scoop_size_unit=scoop_size_unit,
     )
     wm.add_fact(fact=transfer_request, indent="    ")
-    _, derived = engine._forward_chain(transfer_request)
+    _, derived = engine._forward_chain(trigger_fact=transfer_request)
 
     if engine.last_error:
         bindings['?error'] = engine.last_error

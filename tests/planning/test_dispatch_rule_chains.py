@@ -498,17 +498,17 @@ class TestEndToEndEquipmentStates:
 # ---------------------------------------------------------------------------
 
 class TestStepRequestTypeClassification:
-    def _classify(self, step):
+    def _classify(self, *, step):
         """Build a minimal engine, run _build_step_request, return the step_type."""
         wm = WorkingMemory()
         kb = KnowledgeBase()
         engine = PlanningEngine(wm=wm, kb=kb, verbose=False)
-        req = engine._build_step_request(step, 0, [])
+        req = engine._build_step_request(step=step, step_idx=0, resolved_equipment=[])
         return req.attributes['step_type']
 
     def test_mixing_step_gets_mixing_type(self):
         step = MixingStep(description='Mix', substeps=[])
-        assert self._classify(step) == 'MIXING'
+        assert self._classify(step=step) == 'MIXING'
 
     def test_transfer_item_gets_transfer_item_type(self):
         step = TransferItem(
@@ -516,7 +516,7 @@ class TestStepRequestTypeClassification:
             target_equipment_name='BAKING_SHEET',
             scoop_size_amount=2, scoop_size_unit='TABLESPOONS',
         )
-        assert self._classify(step) == 'TRANSFER_ITEM'
+        assert self._classify(step=step) == 'TRANSFER_ITEM'
 
     def test_transfer_item_to_cooling_rack_gets_surface_type(self):
         step = TransferItem(
@@ -524,30 +524,30 @@ class TestStepRequestTypeClassification:
             target_equipment_name='COOLING_RACK',
             scoop_size_amount=1, scoop_size_unit='WHOLE',
         )
-        assert self._classify(step) == 'ITEM_TRANSFER_TO_SURFACE'
+        assert self._classify(step=step) == 'ITEM_TRANSFER_TO_SURFACE'
 
     def test_transfer_equipment_baking_sheet_gets_transfer_type(self):
         step = TransferEquipment(
             description='Transfer', source_equipment_name='BAKING_SHEET',
             target_equipment_name='OVEN',
         )
-        assert self._classify(step) == 'TRANSFER_EQUIPMENT'
+        assert self._classify(step=step) == 'TRANSFER_EQUIPMENT'
 
     def test_transfer_equipment_oven_gets_removal_type(self):
         step = TransferEquipment(
             description='Remove', source_equipment_name='OVEN',
             target_equipment_name='COUNTERTOP',
         )
-        assert self._classify(step) == 'EQUIPMENT_REMOVAL'
+        assert self._classify(step=step) == 'EQUIPMENT_REMOVAL'
 
     def test_cook_step_gets_cook_type(self):
         step = CookStep(description='Bake', substeps=[])
-        assert self._classify(step) == 'COOK'
+        assert self._classify(step=step) == 'COOK'
 
     def test_generic_step_gets_generic_type(self):
         step = Step(description='Do something')
-        assert self._classify(step) == 'GENERIC'
+        assert self._classify(step=step) == 'GENERIC'
 
     def test_wait_step_gets_generic_type(self):
         step = WaitStep(description='Wait', equipment_name='OVEN')
-        assert self._classify(step) == 'GENERIC'
+        assert self._classify(step=step) == 'GENERIC'

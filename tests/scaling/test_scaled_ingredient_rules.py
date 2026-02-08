@@ -40,7 +40,7 @@ def _make_engine(*, ingredient_name, amount, unit='CUPS',
     return engine, trigger
 
 
-def _get_scaled(engine):
+def _get_scaled(*, engine):
     facts = [f for f in engine.working_memory.facts if f.fact_title == 'scaled_ingredient']
     assert len(facts) == 1
     return facts[0]
@@ -52,22 +52,22 @@ class TestScaleIngredientAmount:
     def test_default_ingredient_doubled(self):
         """BUTTER 1 cup * 2.0 (DEFAULT) = 2.0"""
         engine, trigger = _make_engine(ingredient_name='BUTTER', amount=1)
-        engine._forward_chain(trigger)
-        scaled = _get_scaled(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        scaled = _get_scaled(engine=engine)
         assert scaled.attributes['scaled_amount'] == pytest.approx(2.0)
         assert scaled.attributes['original_amount'] == 1
 
     def test_known_ingredient_scaled(self):
         """SALT 1 tsp, scale=2.0, SEASONING*0.8 -> multiplier=1.6, scaled=1.6"""
         engine, trigger = _make_engine(ingredient_name='SALT', amount=1, unit='TEASPOONS')
-        engine._forward_chain(trigger)
-        scaled = _get_scaled(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        scaled = _get_scaled(engine=engine)
         assert scaled.attributes['scaled_amount'] == pytest.approx(1.6)
 
     def test_preserves_unit_and_category(self):
         engine, trigger = _make_engine(ingredient_name='BUTTER', amount=1, unit='CUPS', measurement_category='VOLUME')
-        engine._forward_chain(trigger)
-        scaled = _get_scaled(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        scaled = _get_scaled(engine=engine)
         assert scaled.attributes['unit'] == 'CUPS'
         assert scaled.attributes['measurement_category'] == 'VOLUME'
 
@@ -80,15 +80,15 @@ class TestScaleIngredientFractionalAmounts:
         engine, trigger = _make_engine(
             ingredient_name='BAKING_SODA', amount=0.25, unit='TEASPOONS'
         )
-        engine._forward_chain(trigger)
-        scaled = _get_scaled(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        scaled = _get_scaled(engine=engine)
         assert scaled.attributes['scaled_amount'] == pytest.approx(0.35)
 
     def test_half_cup(self):
         """0.5 cup BUTTER * 2.0 = 1.0"""
         engine, trigger = _make_engine(ingredient_name='BUTTER', amount=0.5)
-        engine._forward_chain(trigger)
-        scaled = _get_scaled(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        scaled = _get_scaled(engine=engine)
         assert scaled.attributes['scaled_amount'] == pytest.approx(1.0)
 
 
@@ -97,7 +97,7 @@ class TestScaleIngredientFractionalAmounts:
 class TestScaleIngredientIdempotency:
     def test_no_duplicate_scaled_ingredient(self):
         engine, trigger = _make_engine(ingredient_name='BUTTER', amount=1)
-        engine._forward_chain(trigger)
-        engine._forward_chain(trigger)
+        engine._forward_chain(trigger_fact=trigger)
+        engine._forward_chain(trigger_fact=trigger)
         facts = [f for f in engine.working_memory.facts if f.fact_title == 'scaled_ingredient']
         assert len(facts) == 1

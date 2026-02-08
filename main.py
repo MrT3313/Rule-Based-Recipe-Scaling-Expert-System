@@ -101,6 +101,6 @@ if __name__ == "__main__":
             explanation = ExplanationFacility(wm=wm, kb=kb, label="Combined")
             explanation.run_repl()
 
-        print_plan(plan)
+        print_plan(plan=plan)
 
 

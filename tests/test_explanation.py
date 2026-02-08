@@ -41,7 +41,7 @@ class TestDerivationTracking:
             priority=1,
         )
         engine = _make_engine(wm_facts=[input_fact], kb_rules=[rule])
-        engine._forward_chain(input_fact)
+        engine._forward_chain(trigger_fact=input_fact)
 
         derived = [f for f in engine.working_memory.facts if f.fact_title == 'classified']
         assert len(derived) == 1
@@ -58,7 +58,7 @@ class TestDerivationTracking:
             priority=1,
         )
         engine = _make_engine(wm_facts=[input_fact], kb_rules=[rule])
-        engine._forward_chain(input_fact)
+        engine._forward_chain(trigger_fact=input_fact)
 
         derived = [f for f in engine.working_memory.facts if f.fact_title == 'classified'][0]
         antecedent_facts = derived.derivation['antecedent_facts']
@@ -82,7 +82,7 @@ class TestDerivationTracking:
             priority=1,
         )
         engine = _make_engine(wm_facts=[input_fact], kb_rules=[rule1, rule2])
-        engine._forward_chain(input_fact)
+        engine._forward_chain(trigger_fact=input_fact)
 
         classified = [f for f in engine.working_memory.facts if f.fact_title == 'classified']
         scaled = [f for f in engine.working_memory.facts if f.fact_title == 'scaled']
@@ -110,7 +110,7 @@ class TestDerivationTracking:
             priority=1,
         )
         engine = _make_engine(wm_facts=[fact_a, fact_b], kb_rules=[rule])
-        engine._forward_chain(fact_a)
+        engine._forward_chain(trigger_fact=fact_a)
 
         joined = [f for f in engine.working_memory.facts if f.fact_title == 'joined']
         assert len(joined) == 1
@@ -133,7 +133,7 @@ class TestDerivationTracking:
             priority=1,
         )
         engine = _make_engine(wm_facts=[input_fact], kb_rules=[rule])
-        engine._forward_chain(input_fact)
+        engine._forward_chain(trigger_fact=input_fact)
 
         side_effects = [f for f in engine.working_memory.facts if f.fact_title == 'side_effect']
         assert len(side_effects) == 1
@@ -158,7 +158,7 @@ class TestDerivationTracking:
             kb_rules=[rule],
             kb_ref_facts=[ref_fact],
         )
-        engine._forward_chain(input_fact)
+        engine._forward_chain(trigger_fact=input_fact)
 
         classified = [f for f in engine.working_memory.facts if f.fact_title == 'classified']
         assert len(classified) == 1
@@ -177,7 +177,7 @@ class TestExplanationFacility:
         f = Fact(fact_title='input', value=1)
         wm.add_fact(fact=f, silent=True)
         ef = ExplanationFacility(wm=wm, kb=kb, label="Test")
-        assert ef._classify_leaf(f) == "INPUT"
+        assert ef._classify_leaf(fact=f) == "INPUT"
 
     def test_classify_leaf_reference(self):
         """A fact matching a KB reference fact should be classified as REFERENCE."""
@@ -189,7 +189,7 @@ class TestExplanationFacility:
         wm_fact = Fact(fact_title='conversion', from_unit='CUP', to_unit='TBSP', factor=16)
         wm.add_fact(fact=wm_fact, silent=True)
         ef = ExplanationFacility(wm=wm, kb=kb, label="Test")
-        assert ef._classify_leaf(wm_fact) == "REFERENCE"
+        assert ef._classify_leaf(fact=wm_fact) == "REFERENCE"
 
     def test_print_derivation_leaf(self, capsys):
         """Printing a leaf fact should show [INPUT]."""
@@ -198,7 +198,7 @@ class TestExplanationFacility:
         f = Fact(fact_title='input', value=1)
         wm.add_fact(fact=f, silent=True)
         ef = ExplanationFacility(wm=wm, kb=kb, label="Test")
-        ef._print_derivation(f)
+        ef._print_derivation(fact=f)
         captured = capsys.readouterr()
         assert "[INPUT]" in captured.out
 
@@ -218,7 +218,7 @@ class TestExplanationFacility:
         wm.add_fact(fact=derived, silent=True)
 
         ef = ExplanationFacility(wm=wm, kb=kb, label="Test")
-        ef._print_derivation(derived)
+        ef._print_derivation(fact=derived)
         captured = capsys.readouterr()
         assert "classify_salt" in captured.out
         assert "antecedents:" in captured.out

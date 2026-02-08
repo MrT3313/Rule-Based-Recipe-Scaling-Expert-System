@@ -125,7 +125,7 @@ def main(*, wm, kb, recipe, args):
     ), silent=True)
 
     print("*"*70)
-    print("⚙️⚙️ RUN PLANNING ENGINE ⚙️⚙️")
+    print("⚙️⚙️ RUN PLANNING INFERENCE ENGINE ⚙️⚙️")
     print("*"*70)
     print("")
 

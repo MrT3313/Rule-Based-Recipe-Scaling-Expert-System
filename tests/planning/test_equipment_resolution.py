@@ -17,7 +17,7 @@ from planning.rules.equipment_transfer_dispatch_rules import get_equipment_trans
 from planning.rules.cook_dispatch_rules import get_cook_dispatch_rules
 
 
-def _make_oven_engine(state):
+def _make_oven_engine(*, state):
     """Build a minimal PlanningEngine with one OVEN in the given state."""
     wm = WorkingMemory()
     wm.add_fact(
@@ -58,7 +58,7 @@ def _make_oven_engine(state):
 
 class TestEquipmentResolution:
     def test_oven_available(self):
-        engine, wm, recipe = _make_oven_engine('AVAILABLE')
+        engine, wm, recipe = _make_oven_engine(state='AVAILABLE')
         success, plan = engine.run(recipe=recipe)
 
         assert success is True
@@ -67,14 +67,14 @@ class TestEquipmentResolution:
         assert wm.facts[0].attributes['state'] == 'IN_USE'
 
     def test_oven_in_use(self):
-        engine, wm, recipe = _make_oven_engine('IN_USE')
+        engine, wm, recipe = _make_oven_engine(state='IN_USE')
         success, error_message = engine.run(recipe=recipe)
 
         assert success is False
         assert 'OVEN' in error_message
 
     def test_oven_dirty(self):
-        engine, wm, recipe = _make_oven_engine('DIRTY')
+        engine, wm, recipe = _make_oven_engine(state='DIRTY')
         success, plan = engine.run(recipe=recipe)
 
         assert success is True
@@ -85,7 +85,7 @@ class TestEquipmentResolution:
         assert wm.facts[0].attributes['state'] == 'IN_USE'
 
 
-def _make_bowl_engine(states):
+def _make_bowl_engine(*, states):
     """Build a PlanningEngine with N BOWLs in the given states, needing len(states) BOWLs."""
     wm = WorkingMemory()
     for i, state in enumerate(states):
@@ -127,7 +127,7 @@ def _make_bowl_engine(states):
 
 class TestMultiEquipmentResolution:
     def test_two_bowls_both_available(self):
-        engine, wm, recipe = _make_bowl_engine(['AVAILABLE', 'AVAILABLE'])
+        engine, wm, recipe = _make_bowl_engine(states=['AVAILABLE', 'AVAILABLE'])
         success, plan = engine.run(recipe=recipe)
 
         assert success is True
@@ -136,7 +136,7 @@ class TestMultiEquipmentResolution:
         assert wm.facts[1].attributes['state'] == 'IN_USE'
 
     def test_two_bowls_one_dirty_one_available(self):
-        engine, wm, recipe = _make_bowl_engine(['DIRTY', 'AVAILABLE'])
+        engine, wm, recipe = _make_bowl_engine(states=['DIRTY', 'AVAILABLE'])
         success, plan = engine.run(recipe=recipe)
 
         assert success is True
@@ -146,7 +146,7 @@ class TestMultiEquipmentResolution:
         assert wm.facts[1].attributes['state'] == 'IN_USE'
 
     def test_two_bowls_both_dirty(self):
-        engine, wm, recipe = _make_bowl_engine(['DIRTY', 'DIRTY'])
+        engine, wm, recipe = _make_bowl_engine(states=['DIRTY', 'DIRTY'])
         success, plan = engine.run(recipe=recipe)
 
         assert success is True
@@ -156,7 +156,7 @@ class TestMultiEquipmentResolution:
         assert wm.facts[1].attributes['state'] == 'IN_USE'
 
     def test_two_bowls_one_in_use(self):
-        engine, wm, recipe = _make_bowl_engine(['AVAILABLE', 'IN_USE'])
+        engine, wm, recipe = _make_bowl_engine(states=['AVAILABLE', 'IN_USE'])
         success, error_message = engine.run(recipe=recipe)
 
         assert success is False
@@ -170,7 +170,7 @@ class TestMultiEquipmentResolution:
 class TestEquipmentCleanedFact:
     def test_equipment_cleaned_fact_on_dirty(self):
         """equipment_cleaned derived when resolving DIRTY oven."""
-        engine, wm, recipe = _make_oven_engine('DIRTY')
+        engine, wm, recipe = _make_oven_engine(state='DIRTY')
         success, plan = engine.run(recipe=recipe)
 
         assert success is True
@@ -181,7 +181,7 @@ class TestEquipmentCleanedFact:
 
     def test_no_cleaned_fact_when_available(self):
         """No equipment_cleaned when oven is already AVAILABLE."""
-        engine, wm, recipe = _make_oven_engine('AVAILABLE')
+        engine, wm, recipe = _make_oven_engine(state='AVAILABLE')
         success, plan = engine.run(recipe=recipe)
 
         assert success is True
@@ -190,7 +190,7 @@ class TestEquipmentCleanedFact:
 
     def test_multiple_dirty_bowls_multiple_cleaned(self):
         """2 equipment_cleaned facts for 2 DIRTY bowls."""
-        engine, wm, recipe = _make_bowl_engine(['DIRTY', 'DIRTY'])
+        engine, wm, recipe = _make_bowl_engine(states=['DIRTY', 'DIRTY'])
         success, plan = engine.run(recipe=recipe)
 
         assert success is True

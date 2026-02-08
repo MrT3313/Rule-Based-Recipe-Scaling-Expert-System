@@ -59,7 +59,7 @@ def main(*, wm, kb, recipe, args):
         )
 
     print("*"*70)
-    print("⚙️⚙️ RUN INFERENCE ENGINE ⚙️⚙️")
+    print("⚙️⚙️ RUN SCALING INFERENCE ENGINE ⚙️⚙️")
     print("*"*70)
     print("")
 

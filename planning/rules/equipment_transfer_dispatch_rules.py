@@ -39,7 +39,7 @@ def _initialize_equipment_transfer(*, bindings, wm, kb, plan):
     )
     wm.add_fact(fact=preheat_request, indent="  ")
 
-    _, derived = engine._forward_chain(preheat_request)
+    _, derived = engine._forward_chain(trigger_fact=preheat_request)
 
     if engine.last_error:
         bindings['?error'] = engine.last_error
@@ -57,7 +57,7 @@ def _initialize_equipment_transfer(*, bindings, wm, kb, plan):
     )
     wm.add_fact(fact=planning_request, indent="  ")
 
-    _, derived = engine._forward_chain(planning_request)
+    _, derived = engine._forward_chain(trigger_fact=planning_request)
 
     if engine.last_error:
         bindings['?error'] = engine.last_error
@@ -110,7 +110,7 @@ def _place_next_sheet(*, bindings, wm, kb, plan):
     )
     wm.add_fact(fact=rack_request, indent="    ")
 
-    _, rack_result = engine._forward_chain(rack_request)
+    _, rack_result = engine._forward_chain(trigger_fact=rack_request)
     rack_bindings = engine._last_bindings
 
     if engine.verbose and rack_result is not None:
@@ -121,7 +121,7 @@ def _place_next_sheet(*, bindings, wm, kb, plan):
     if not rack_found:
         # Resolve new oven
         equipment_need = {'equipment_name': target_equipment_name, 'required_count': 1}
-        resolved_list = engine._resolve_equipment(equipment_need)
+        resolved_list = engine._resolve_equipment(equipment_need=equipment_need)
         if resolved_list is None:
             bindings['?error'] = f"Could not resolve additional {target_equipment_name}"
             return bindings
@@ -146,7 +146,7 @@ def _place_next_sheet(*, bindings, wm, kb, plan):
         )
         wm.add_fact(fact=rack_request2, indent="    ")
 
-        _, rack_result2 = engine._forward_chain(rack_request2)
+        _, rack_result2 = engine._forward_chain(trigger_fact=rack_request2)
         rack_bindings2 = engine._last_bindings
 
         if engine.verbose and rack_result2 is not None:
@@ -177,7 +177,7 @@ def _place_next_sheet(*, bindings, wm, kb, plan):
     )
     wm.add_fact(fact=transfer_request, indent="    ")
 
-    _, derived = engine._forward_chain(transfer_request)
+    _, derived = engine._forward_chain(trigger_fact=transfer_request)
 
     if engine.last_error:
         bindings['?error'] = engine.last_error

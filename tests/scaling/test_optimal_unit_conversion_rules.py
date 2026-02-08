@@ -44,7 +44,7 @@ def _make_engine(*, ingredient_name, amount, unit='CUPS',
     return engine, trigger
 
 
-def _get_optimal(engine):
+def _get_optimal(*, engine):
     facts = [f for f in engine.working_memory.facts if f.fact_title == 'optimally_scaled_ingredient']
     assert len(facts) == 1
     return facts[0]
@@ -56,8 +56,8 @@ class TestOptimalUnitNoConversion:
     def test_stays_in_cups(self):
         """1.5 cups (scaled) stays as 1.5 cups — already clean."""
         engine, trigger = _make_engine(ingredient_name='WHITE_SUGAR', amount=0.75)
-        engine._forward_chain(trigger)
-        optimal = _get_optimal(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        optimal = _get_optimal(engine=engine)
         components = optimal.attributes['components']
         assert len(components) == 1
         assert components[0]['unit'] == 'CUPS'
@@ -69,8 +69,8 @@ class TestOptimalUnitNoConversion:
             ingredient_name='VANILLA_EXTRACT', amount=2,
             unit='TEASPOONS', measurement_category='LIQUID',
         )
-        engine._forward_chain(trigger)
-        optimal = _get_optimal(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        optimal = _get_optimal(engine=engine)
         components = optimal.attributes['components']
         assert len(components) == 1
         assert components[0]['unit'] == 'TEASPOONS'
@@ -82,8 +82,8 @@ class TestOptimalUnitUpConversion:
     def test_cups_to_pints(self):
         """2 cups -> scaled 4 cups -> should convert to higher unit."""
         engine, trigger = _make_engine(ingredient_name='CHOCOLATE_CHIPS', amount=2)
-        engine._forward_chain(trigger)
-        optimal = _get_optimal(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        optimal = _get_optimal(engine=engine)
         components = optimal.attributes['components']
         # 4 cups = 1 quart
         total_tsp = sum(
@@ -97,8 +97,8 @@ class TestOptimalUnitUpConversion:
     def test_butter_cups_to_pints(self):
         """1 cup * 2.0 = 2 cups -> 1 pint."""
         engine, trigger = _make_engine(ingredient_name='BUTTER', amount=1)
-        engine._forward_chain(trigger)
-        optimal = _get_optimal(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        optimal = _get_optimal(engine=engine)
         components = optimal.attributes['components']
         assert len(components) == 1
         assert components[0]['unit'] == 'PINTS'
@@ -113,8 +113,8 @@ class TestOptimalUnitMultiComponent:
         engine, trigger = _make_engine(
             ingredient_name='ALL_PURPOSE_FLOUR', amount=2.25
         )
-        engine._forward_chain(trigger)
-        optimal = _get_optimal(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        optimal = _get_optimal(engine=engine)
         components = optimal.attributes['components']
         # 4.5 cups = 216 tsp, verify total volume is preserved
         conversion = {'TEASPOONS': 1, 'TABLESPOONS': 3, 'CUPS': 48, 'PINTS': 96, 'QUARTS': 192}
@@ -132,8 +132,8 @@ class TestOptimalUnitPinchDash:
             unit='PINCH', measurement_category='VOLUME',
             scale_factor=2.0,
         )
-        engine._forward_chain(trigger)
-        optimal = _get_optimal(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        optimal = _get_optimal(engine=engine)
         components = optimal.attributes['components']
         assert len(components) == 1
         assert components[0]['unit'] == 'PINCH'
@@ -144,8 +144,8 @@ class TestOptimalUnitPinchDash:
             unit='DASH', measurement_category='VOLUME',
             scale_factor=2.0,
         )
-        engine._forward_chain(trigger)
-        optimal = _get_optimal(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        optimal = _get_optimal(engine=engine)
         components = optimal.attributes['components']
         assert len(components) == 1
         assert components[0]['unit'] == 'DASH'
@@ -159,8 +159,8 @@ class TestOptimalUnitWeightMeasurements:
             ingredient_name='CREAM_CHEESE', amount=8,
             unit='OUNCES', measurement_category='WEIGHT',
         )
-        engine._forward_chain(trigger)
-        optimal = _get_optimal(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        optimal = _get_optimal(engine=engine)
         components = optimal.attributes['components']
         # 8 oz * 2.0 = 16 oz = 1 lb
         assert len(components) == 1
@@ -172,8 +172,8 @@ class TestOptimalUnitWeightMeasurements:
             ingredient_name='GROUND_BEEF', amount=1,
             unit='POUNDS', measurement_category='WEIGHT',
         )
-        engine._forward_chain(trigger)
-        optimal = _get_optimal(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        optimal = _get_optimal(engine=engine)
         components = optimal.attributes['components']
         # 1 lb * 2.0 = 2 lbs
         assert len(components) == 1
@@ -189,8 +189,8 @@ class TestOptimalUnitWholeMeasurements:
             ingredient_name='EGGS', amount=2,
             unit='WHOLE', measurement_category='WHOLE',
         )
-        engine._forward_chain(trigger)
-        optimal = _get_optimal(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        optimal = _get_optimal(engine=engine)
         components = optimal.attributes['components']
         # 2 * 2.0 = 4 whole
         assert len(components) == 1
@@ -202,8 +202,8 @@ class TestOptimalUnitWholeMeasurements:
             ingredient_name='EGGS', amount=1,
             unit='DOZEN', measurement_category='WHOLE',
         )
-        engine._forward_chain(trigger)
-        optimal = _get_optimal(engine)
+        engine._forward_chain(trigger_fact=trigger)
+        optimal = _get_optimal(engine=engine)
         components = optimal.attributes['components']
         # 1 dozen * 2.0 = 2 dozen
         assert len(components) == 1
@@ -216,7 +216,7 @@ class TestOptimalUnitWholeMeasurements:
 class TestOptimalUnitIdempotency:
     def test_no_duplicate_optimal(self):
         engine, trigger = _make_engine(ingredient_name='BUTTER', amount=1)
-        engine._forward_chain(trigger)
-        engine._forward_chain(trigger)
+        engine._forward_chain(trigger_fact=trigger)
+        engine._forward_chain(trigger_fact=trigger)
         facts = [f for f in engine.working_memory.facts if f.fact_title == 'optimally_scaled_ingredient']
         assert len(facts) == 1

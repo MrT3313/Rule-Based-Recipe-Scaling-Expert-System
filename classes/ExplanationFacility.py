@@ -31,27 +31,27 @@ class ExplanationFacility:
                 print(f"Invalid input: '{user_input}'. Enter a fact number or 'c'.")
                 continue
 
-            fact = self._find_fact(fact_id)
+            fact = self._find_fact(fact_id=fact_id)
             if fact is None:
                 print(f"No fact with ID #{fact_id} found.")
                 continue
 
             print("")
-            self._print_derivation(fact, indent=0)
+            self._print_derivation(fact=fact, indent=0)
             print("")
 
-    def _find_fact(self, fact_id):
+    def _find_fact(self, *, fact_id):
         for fact in self.wm.facts:
             if fact.fact_id == fact_id:
                 return fact
         return None
 
-    def _print_derivation(self, fact, indent=0):
+    def _print_derivation(self, *, fact, indent=0):
         prefix = "\t" * indent
         connector = "+-- " if indent > 0 else ""
 
         if fact.derivation is None:
-            leaf_label = self._classify_leaf(fact)
+            leaf_label = self._classify_leaf(fact=fact)
             print(f"{prefix}{connector}{fact}  [{leaf_label}]")
             return
 
@@ -64,9 +64,9 @@ class ExplanationFacility:
         if antecedent_facts:
             print(f"{prefix}    antecedents:")
             for ant_fact in antecedent_facts:
-                self._print_derivation(ant_fact, indent=indent + 1)
+                self._print_derivation(fact=ant_fact, indent=indent + 1)
 
-    def _classify_leaf(self, fact):
+    def _classify_leaf(self, *, fact):
         for ref in self.kb.reference_facts:
             if ref.fact_title == fact.fact_title and ref.attributes == fact.attributes:
                 return "REFERENCE"

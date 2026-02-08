@@ -10,24 +10,15 @@ class ScalingEngine:
         self.verbose = verbose
 
     def run(self):
-        if self.verbose:
-            print("=" * 70)
-            print("STARTING FORWARD CHAINING INFERENCE ENGINE (DFS)")
-            print("=" * 70)
-            print("")
-
         # Snapshot recipe_ingredient facts — these are the triggers
-        triggers = [f for f in self.working_memory.facts if f.fact_title == 'recipe_ingredient']
+        # triggers = self.working_memory.facts
+        triggers = [f for f in self.working_memory.facts]
 
+        # for trigger in self.working_memory.facts:
         for trigger in triggers:
-            self._forward_chain(trigger)
+            self._forward_chain(trigger_fact=trigger)
 
-        if self.verbose:
-            print("")
-            print(f"Inference complete.")
-            print(f"Working memory now contains {len(self.working_memory.facts)} facts")
-
-    def _forward_chain(self, trigger_fact):
+    def _forward_chain(self, *, trigger_fact):
         """Find matching rules for a trigger fact, resolve conflict, fire via DFS.
         Uses a while-loop to exhaust all matches for the trigger.
         Returns (any_rule_fired, last_derived_fact)."""
@@ -35,7 +26,7 @@ class ScalingEngine:
         any_rule_fired = False
         fired = set()
 
-        matches = self._find_matching_rules(trigger_fact)
+        matches = self._find_matching_rules(trigger_fact=trigger_fact)
         while matches:
             wm_size = len(self.working_memory.facts)
 
@@ -58,20 +49,20 @@ class ScalingEngine:
             if not fresh:
                 break
 
-            best_rule, best_bindings, fire_key = self._resolve_conflict(fresh)
+            best_rule, best_bindings, fire_key = self._resolve_conflict(matches=fresh)
             fired.add(fire_key)
 
             any_rule_fired = True
-            derived = self._fire_rule_dfs(best_rule, best_bindings)
+            derived = self._fire_rule_dfs(rule=best_rule, bindings=best_bindings)
             if derived is not None:
                 last_derived = derived
 
             # Re-evaluate: new facts may have changed what matches
-            matches = self._find_matching_rules(trigger_fact)
+            matches = self._find_matching_rules(trigger_fact=trigger_fact)
 
         return (any_rule_fired, last_derived)
 
-    def _find_matching_rules(self, trigger_fact):
+    def _find_matching_rules(self, *, trigger_fact):
         """Return all (rule, bindings) pairs whose antecedents are satisfied.
         Uses trigger_fact as a cheap filter: only consider rules where at least one
         positive antecedent unifies with the trigger."""
@@ -81,7 +72,7 @@ class ScalingEngine:
                 if isinstance(antecedent, NegatedFact):
                     continue
 
-                initial_bindings = self._unify(antecedent, trigger_fact, {})
+                initial_bindings = self._unify(pattern=antecedent, fact=trigger_fact, bindings={})
                 if initial_bindings is None:
                     continue
 
@@ -90,7 +81,7 @@ class ScalingEngine:
                 # Anchor: this antecedent binds to trigger_fact.
                 # Match remaining antecedents against all KB + WM facts.
                 remaining = rule.antecedents[:ant_idx] + rule.antecedents[ant_idx + 1:]
-                bindings_list = self._match_antecedents(remaining, initial_bindings)
+                bindings_list = self._match_antecedents(antecedents=remaining, bindings=initial_bindings)
                 for bindings in bindings_list:
                     if (rule, bindings) not in matches:
                         matches.append((rule, bindings))
@@ -98,7 +89,7 @@ class ScalingEngine:
 
         return matches
 
-    def _match_antecedents(self, antecedents, bindings):
+    def _match_antecedents(self, *, antecedents, bindings):
         """Recursively match a list of antecedents against KB reference facts + WM facts.
         Returns all valid binding sets. Handles NegatedFact via negation-as-failure."""
         if not antecedents:
@@ -111,20 +102,20 @@ class ScalingEngine:
         if isinstance(first, NegatedFact):
             pattern = first.fact
             for fact in all_facts:
-                if self._unify(pattern, fact, bindings) is not None:
+                if self._unify(pattern=pattern, fact=fact, bindings=bindings) is not None:
                     return []
-            return self._match_antecedents(rest, bindings)
+            return self._match_antecedents(antecedents=rest, bindings=bindings)
 
         results = []
         for fact in all_facts:
-            new_bindings = self._unify(first, fact, bindings)
+            new_bindings = self._unify(pattern=first, fact=fact, bindings=bindings)
             if new_bindings is not None:
                 new_bindings['_matched_facts'] = bindings.get('_matched_facts', []) + [fact]
-                sub_results = self._match_antecedents(rest, new_bindings)
+                sub_results = self._match_antecedents(antecedents=rest, bindings=new_bindings)
                 results.extend(sub_results)
         return results
 
-    def _unify(self, pattern, fact, bindings):
+    def _unify(self, *, pattern, fact, bindings):
         """Try to match one antecedent pattern against one fact.
         Returns updated bindings dict or None on failure."""
         if pattern.fact_title != fact.fact_title:
@@ -150,7 +141,7 @@ class ScalingEngine:
 
         return new_bindings
 
-    def _apply_bindings(self, fact_template, bindings):
+    def _apply_bindings(self, *, fact_template, bindings):
         """Substitute ?variables in a consequent template with concrete values from bindings."""
         new_attrs = {}
         for key, value in fact_template.attributes.items():
@@ -163,21 +154,21 @@ class ScalingEngine:
                 new_attrs[key] = value
         return Fact(fact_title=fact_template.fact_title, **new_attrs)
 
-    def _fact_exists(self, fact):
+    def _fact_exists(self, *, fact):
         """Check if an identical fact is already in working memory."""
         for existing in self.working_memory.facts:
             if existing.fact_title == fact.fact_title and existing.attributes == fact.attributes:
                 return True
         return False
 
-    def _resolve_conflict(self, matches):
+    def _resolve_conflict(self, *, matches):
         """Pick the best (rule, bindings, fire_key) from a list.
         Supports priority (default) and specificity strategies."""
         if self.conflict_resolution_strategy == "specificity":
             return max(matches, key=lambda x: len(x[0].antecedents))
         return max(matches, key=lambda x: x[0].priority)
 
-    def _fire_rule_dfs(self, rule, bindings):
+    def _fire_rule_dfs(self, *, rule, bindings):
         """Fire a rule: run action_fn if present, then derive consequent.
         DFS: if the derived fact triggers further rules, fire them recursively
         via a while-loop with explicit fired-set tracking."""
@@ -190,8 +181,8 @@ class ScalingEngine:
             bindings = rule.action_fn(bindings=bindings, wm=self.working_memory, kb=self.knowledge_base)
 
         if rule.consequent is not None:
-            derived = self._apply_bindings(rule.consequent, bindings)
-            if not self._fact_exists(derived):
+            derived = self._apply_bindings(fact_template=rule.consequent, bindings=bindings)
+            if not self._fact_exists(fact=derived):
                 derived.derivation = derivation
                 self.working_memory.add_fact(fact=derived, silent=not self.verbose)
 
@@ -202,7 +193,7 @@ class ScalingEngine:
 
             # DFS: chase rules triggered by the derived fact
             fired = set()
-            chain_matches = self._find_matching_rules(derived)
+            chain_matches = self._find_matching_rules(trigger_fact=derived)
             while chain_matches:
                 wm_size = len(self.working_memory.facts)
 
@@ -224,12 +215,12 @@ class ScalingEngine:
                 if not fresh:
                     break
 
-                best_chain_rule, best_chain_bindings, fire_key = self._resolve_conflict(fresh)
+                best_chain_rule, best_chain_bindings, fire_key = self._resolve_conflict(matches=fresh)
                 fired.add(fire_key)
 
-                self._fire_rule_dfs(best_chain_rule, best_chain_bindings)
+                self._fire_rule_dfs(rule=best_chain_rule, bindings=best_chain_bindings)
 
-                chain_matches = self._find_matching_rules(derived)
+                chain_matches = self._find_matching_rules(trigger_fact=derived)
 
             return derived
 

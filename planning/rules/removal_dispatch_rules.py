@@ -119,7 +119,7 @@ def _process_oven_slot_removal(*, bindings, wm, kb, plan):
         target_equipment_id=target_equipment_id,
     )
     wm.add_fact(fact=removal_request, indent="    ")
-    _, derived = engine._forward_chain(removal_request)
+    _, derived = engine._forward_chain(trigger_fact=removal_request)
 
     if engine.last_error:
         bindings['?error'] = engine.last_error

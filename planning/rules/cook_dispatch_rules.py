@@ -58,12 +58,12 @@ def _initialize_cook(*, bindings, wm, kb, plan):
     )
     wm.add_fact(fact=preheat_request, indent="  ")
 
-    preheat_matches = engine._find_matching_rules(preheat_request)
+    preheat_matches = engine._find_matching_rules(trigger_fact=preheat_request)
     if not preheat_matches:
         bindings['?error'] = "No rule matched for preheat_check_request"
         return bindings
 
-    best_rule, best_bindings_preheat = engine._resolve_conflict(preheat_matches)
+    best_rule, best_bindings_preheat = engine._resolve_conflict(matches=preheat_matches)
 
     current_oven_id = best_bindings_preheat.get('?equipment_id')
     if current_oven_id is None:
@@ -83,7 +83,7 @@ def _initialize_cook(*, bindings, wm, kb, plan):
         engine._cook_oven_substeps = {}
     engine._cook_oven_substeps[current_oven_id] = []
 
-    derived = engine._fire_rule_dfs(best_rule, best_bindings_preheat,
+    derived = engine._fire_rule_dfs(rule=best_rule, bindings=best_bindings_preheat,
                                      plan_override=engine._cook_oven_substeps[current_oven_id])
 
     if '?error' in best_bindings_preheat:
@@ -104,7 +104,7 @@ def _initialize_cook(*, bindings, wm, kb, plan):
     )
     wm.add_fact(fact=planning_request, indent="  ")
 
-    _, derived = engine._forward_chain(planning_request)
+    _, derived = engine._forward_chain(trigger_fact=planning_request)
 
     if engine.last_error:
         bindings['?error'] = engine.last_error
@@ -171,7 +171,7 @@ def _place_sheet_for_cooking(*, bindings, wm, kb, plan):
     )
     wm.add_fact(fact=rack_request, indent="    ")
 
-    _, rack_result = engine._forward_chain(rack_request)
+    _, rack_result = engine._forward_chain(trigger_fact=rack_request)
     rack_bindings = engine._last_bindings
 
     if engine.verbose and rack_result is not None:
@@ -195,15 +195,15 @@ def _place_sheet_for_cooking(*, bindings, wm, kb, plan):
                     equipment_id=oven_id,
                 )
                 if len(existing_contents) >= num_racks:
-                    _fire_cooking_wait(engine, duration, duration_unit, oven_id,
-                                      target_equipment_name, oven_substeps[oven_id])
+                    _fire_cooking_wait(engine=engine, duration=duration, duration_unit=duration_unit, oven_id=oven_id,
+                                       target_equipment_name=target_equipment_name, substeps_list=oven_substeps[oven_id])
                     ovens_with_cooking_started.add(oven_id)
-                    _finalize_oven_cook_step(step, oven_id, target_equipment_name,
-                                            oven_substeps, plan)
+                    _finalize_oven_cook_step(step=step, oven_id=oven_id, target_equipment_name=target_equipment_name,
+                                            oven_substeps=oven_substeps, plan=plan)
 
         # Resolve new oven
         equipment_need = {'equipment_name': target_equipment_name, 'required_count': 1}
-        resolved_list = engine._resolve_equipment(equipment_need)
+        resolved_list = engine._resolve_equipment(equipment_need=equipment_need)
         if resolved_list is None:
             bindings['?error'] = f"Could not resolve additional {target_equipment_name}"
             return bindings
@@ -229,7 +229,7 @@ def _place_sheet_for_cooking(*, bindings, wm, kb, plan):
         )
         wm.add_fact(fact=rack_request2, indent="    ")
 
-        _, rack_result2 = engine._forward_chain(rack_request2)
+        _, rack_result2 = engine._forward_chain(trigger_fact=rack_request2)
         rack_bindings2 = engine._last_bindings
 
         if engine.verbose and rack_result2 is not None:
@@ -264,7 +264,7 @@ def _place_sheet_for_cooking(*, bindings, wm, kb, plan):
     )
     wm.add_fact(fact=transfer_request, indent="    ")
 
-    _, derived = engine._forward_chain(transfer_request)
+    _, derived = engine._forward_chain(trigger_fact=transfer_request)
 
     if engine.last_error:
         bindings['?error'] = engine.last_error
@@ -308,11 +308,11 @@ def _fire_remaining_cooking_waits(*, bindings, wm, kb, plan):
                 equipment_id=oid,
             )
             if len(existing_contents) > 0:
-                _fire_cooking_wait(engine, duration, duration_unit, oid,
-                                  target_equipment_name, oven_substeps[oid])
+                _fire_cooking_wait(engine=engine, duration=duration, duration_unit=duration_unit, oven_id=oid,
+                                   target_equipment_name=target_equipment_name, substeps_list=oven_substeps[oid])
                 ovens_with_cooking_started.add(oid)
-                _finalize_oven_cook_step(step, oid, target_equipment_name,
-                                        oven_substeps, plan)
+                _finalize_oven_cook_step(step=step, oven_id=oid, target_equipment_name=target_equipment_name,
+                                        oven_substeps=oven_substeps, plan=plan)
 
     # Clean up transient state
     if hasattr(engine, '_cook_oven_substeps'):
@@ -329,7 +329,7 @@ def _fire_remaining_cooking_waits(*, bindings, wm, kb, plan):
     return bindings
 
 
-def _fire_cooking_wait(engine, duration, duration_unit, oven_id, target_equipment_name, substeps_list):
+def _fire_cooking_wait(*, engine, duration, duration_unit, oven_id, target_equipment_name, substeps_list):
     cooking_request = Fact(
         fact_title='cooking_wait_request',
         target_equipment_name=target_equipment_name,
@@ -339,10 +339,10 @@ def _fire_cooking_wait(engine, duration, duration_unit, oven_id, target_equipmen
     )
     engine.working_memory.add_fact(fact=cooking_request, indent="    ")
 
-    matches = engine._find_matching_rules(cooking_request)
+    matches = engine._find_matching_rules(trigger_fact=cooking_request)
     if matches:
-        best_rule, best_bindings = engine._resolve_conflict(matches)
-        derived = engine._fire_rule_dfs(best_rule, best_bindings, plan_override=substeps_list)
+        best_rule, best_bindings = engine._resolve_conflict(matches=matches)
+        derived = engine._fire_rule_dfs(rule=best_rule, bindings=best_bindings, plan_override=substeps_list)
 
         if engine.verbose:
             print(f"    [Rule fired] {best_rule.rule_name}")
@@ -350,7 +350,7 @@ def _fire_cooking_wait(engine, duration, duration_unit, oven_id, target_equipmen
                 print(f"    [Derived] {derived}")
 
 
-def _finalize_oven_cook_step(step, oven_id, target_equipment_name, oven_substeps, plan):
+def _finalize_oven_cook_step(*, step, oven_id, target_equipment_name, oven_substeps, plan):
     cook = CookStep(
         description=f"{step.description} ({target_equipment_name} #{oven_id})",
         substeps=oven_substeps[oven_id],

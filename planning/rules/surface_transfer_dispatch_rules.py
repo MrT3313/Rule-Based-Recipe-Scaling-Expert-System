@@ -57,7 +57,7 @@ def _transfer_item_to_surface(*, bindings, wm, kb, plan):
             )
             wm.add_fact(fact=transfer_request, indent="    ")
 
-            _, derived = engine._forward_chain(transfer_request)
+            _, derived = engine._forward_chain(trigger_fact=transfer_request)
 
             if engine.last_error:
                 bindings['?error'] = engine.last_error

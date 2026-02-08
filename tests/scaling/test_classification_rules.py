@@ -40,28 +40,28 @@ def _make_engine(*, ingredient_name, amount=1, unit='TEASPOONS', measurement_cat
 class TestClassifyKnownIngredient:
     def test_baking_soda_is_leavening_agent(self):
         engine, trigger = _make_engine(ingredient_name='BAKING_SODA')
-        engine._forward_chain(trigger)
+        engine._forward_chain(trigger_fact=trigger)
         classified = [f for f in engine.working_memory.facts if f.fact_title == 'classified_ingredient']
         assert len(classified) == 1
         assert classified[0].attributes['classification'] == 'LEAVENING_AGENT'
 
     def test_baking_powder_is_leavening_agent(self):
         engine, trigger = _make_engine(ingredient_name='BAKING_POWDER')
-        engine._forward_chain(trigger)
+        engine._forward_chain(trigger_fact=trigger)
         classified = [f for f in engine.working_memory.facts if f.fact_title == 'classified_ingredient']
         assert len(classified) == 1
         assert classified[0].attributes['classification'] == 'LEAVENING_AGENT'
 
     def test_salt_is_seasoning(self):
         engine, trigger = _make_engine(ingredient_name='SALT')
-        engine._forward_chain(trigger)
+        engine._forward_chain(trigger_fact=trigger)
         classified = [f for f in engine.working_memory.facts if f.fact_title == 'classified_ingredient']
         assert len(classified) == 1
         assert classified[0].attributes['classification'] == 'SEASONING'
 
     def test_vanilla_extract_is_extract(self):
         engine, trigger = _make_engine(ingredient_name='VANILLA_EXTRACT', measurement_category='LIQUID')
-        engine._forward_chain(trigger)
+        engine._forward_chain(trigger_fact=trigger)
         classified = [f for f in engine.working_memory.facts if f.fact_title == 'classified_ingredient']
         assert len(classified) == 1
         assert classified[0].attributes['classification'] == 'EXTRACT'
@@ -72,21 +72,21 @@ class TestClassifyKnownIngredient:
 class TestClassifyDefaultIngredient:
     def test_butter_is_default(self):
         engine, trigger = _make_engine(ingredient_name='BUTTER', unit='CUPS')
-        engine._forward_chain(trigger)
+        engine._forward_chain(trigger_fact=trigger)
         classified = [f for f in engine.working_memory.facts if f.fact_title == 'classified_ingredient']
         assert len(classified) == 1
         assert classified[0].attributes['classification'] == 'DEFAULT'
 
     def test_flour_is_default(self):
         engine, trigger = _make_engine(ingredient_name='ALL_PURPOSE_FLOUR', unit='CUPS')
-        engine._forward_chain(trigger)
+        engine._forward_chain(trigger_fact=trigger)
         classified = [f for f in engine.working_memory.facts if f.fact_title == 'classified_ingredient']
         assert len(classified) == 1
         assert classified[0].attributes['classification'] == 'DEFAULT'
 
     def test_chocolate_chips_is_default(self):
         engine, trigger = _make_engine(ingredient_name='CHOCOLATE_CHIPS', unit='CUPS')
-        engine._forward_chain(trigger)
+        engine._forward_chain(trigger_fact=trigger)
         classified = [f for f in engine.working_memory.facts if f.fact_title == 'classified_ingredient']
         assert len(classified) == 1
         assert classified[0].attributes['classification'] == 'DEFAULT'
@@ -98,7 +98,7 @@ class TestClassificationPriority:
     def test_known_fires_before_default(self):
         """Known ingredient rule (P=100) should fire, not default (P=50)."""
         engine, trigger = _make_engine(ingredient_name='SALT')
-        engine._forward_chain(trigger)
+        engine._forward_chain(trigger_fact=trigger)
         classified = [f for f in engine.working_memory.facts if f.fact_title == 'classified_ingredient']
         assert len(classified) == 1
         assert classified[0].attributes['classification'] == 'SEASONING'
@@ -109,19 +109,19 @@ class TestClassificationPriority:
 class TestClassificationIdempotency:
     def test_no_duplicate_classification(self):
         engine, trigger = _make_engine(ingredient_name='SALT')
-        engine._forward_chain(trigger)
-        engine._forward_chain(trigger)
+        engine._forward_chain(trigger_fact=trigger)
+        engine._forward_chain(trigger_fact=trigger)
         classified = [f for f in engine.working_memory.facts if f.fact_title == 'classified_ingredient']
         assert len(classified) == 1
 
     def test_negated_fact_prevents_reclassification(self):
         """Even with WM changes, the NegatedFact guard blocks a second classified_ingredient."""
         engine, trigger = _make_engine(ingredient_name='BUTTER', unit='CUPS')
-        engine._forward_chain(trigger)
+        engine._forward_chain(trigger_fact=trigger)
         # Add a spurious fact to change WM
         engine.working_memory.add_fact(
             fact=Fact(fact_title='dummy', val=1), silent=True
         )
-        engine._forward_chain(trigger)
+        engine._forward_chain(trigger_fact=trigger)
         classified = [f for f in engine.working_memory.facts if f.fact_title == 'classified_ingredient']
         assert len(classified) == 1
