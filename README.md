@@ -1,229 +1,49 @@
-# Rule Based Depth First Expert System for Recipe Scaling
+# HW2: Rule Based Depth First Expert System for Recipe Scaling
 
-## Brain
+## General Retrospective
 
-### Knowledge Base
+Wow. This was much harder than I anticipated.
 
-> The Knowledge Base holds permanent knowledge: Rules & Reference Facts
+Ultimately what you are seeing the third attempt at this assignment and I have a completely different perspective of the two subsections I was required to split the assignment up into in order to remain somewhat sane. Scaling & Planning.  
+
+Part of the reason I chose to pursue the implementation of my groups HW1 rules for a Rule Based Expert System for Recipe Scaling was because I knew things would get _interesting_ when scaled to the limit. Some of these interesting aspects would be ingredient and equipment substitution which in and of itself would require changes to the underlying recipe. Two examples of this would be cooking a stew in a wider pot required lowering the cooking temperature because the liquid would evaporate faster and changing baking equipment from a glass to a ceramic might required adjustments to the cooking temperature and timing due to how heat is retained and transferred in different materials.
+
+> [!IMPORTANT]
 > 
-> A Reference Fact is "background" knowledge (unit conversions, classification, etc. relevant to the domain)
+> If I had chosen to focus on this substitution based logic and built a "Substitution Engine" instead of a "Scaling Engine" I believe I would have a "better" submission (or at least something I am happer with / prouder of). 
 
-### Working Memory
+Instead, I decided to test the durability of my forehead against how the scaling and equipment constraints turn this problem into a planning problem where batching needs to be calculated dynamically potentially at multiple "levels" of the steps (main vs nested substeps). 
 
-> Working Memory is the "current state" of the application holding the current facts that have been derived based on the matching and unification of the Knowledge Base Rules with the Working Memory facts.
+> [!IMPORTANT]
+> 
+> Because of this I am asking that you grade this assignment from two perspectives. The [Scaling Ingredients](/DOCS/scaling/1.Scaling.md) part and the [Planning Scaled Recipe Steps](/DOCS/planning/2.Planning.md) part.
 
-## Inference Engines
+The `Scaling Ingredients` part of the assignment follows very closely to the rules and approach from HW1. This includes rules for classifying individual ingredients and then chaining those classifications to specific scaling tolerance rules as well as adhering to heuristic measurements when below a threshold ("a pinch" / "a dash"). 
 
-### Scaling
+The `Planning Scaled Recipe Steps` part of the assignment itself went through countless attempts to adhere to the If-Then approach for Rule Based Expert Systems but I kept on finding myself "needing" to fall back to various "helper functions" to take specific actions. While the final submission has much less of them they are still there, particularly regarding the actual batch planning, while the closer you get to the individual steps & substeps we get closer to a true Rule Based Expert System.
 
-The `ScalingEngine` is a forward-chaining production system that takes recipe ingredient facts and derives scaled/classified outputs by matching rules against working memory and knowledge base reference facts.
+> [!WARNING]
+> 
+> I did use AI (Claude code) on the Planning Scaled Recipe Steps after **multiple** attempts at batching with the hopes of discovering some baseline approach that I was missing and therefore getting _something_ to submit. With the level of slop I sifted through I am unsure how helpful this even was at the end of the day (but I did get to _a_ solution so I guess there is that). AI was also used to build the test suites to "lockin" the logic after it was built (I did not follow a TDD approach). 
+> 
+> Some of the structural improvements made in the Planning Inference Engine were brought back to the Scaling Inference Engine **after** I had a fully working solution that answered all assignments components like the Rule Based Expert Systems if/then logic, multiple conflict resolution, an explanation component, etc...  
 
-#### Functions
+My initial approach was to focus on simply getting the recipe planning working based on the assumption of enough equipment but in retrospect knowing that I wanted to scale to the limit I should have focused on the batching logic at the very start with a dumbed down mock recipe (1 or 2 ingredients with 1 or 2 steps). 
 
-| Method | Purpose |
-|---|---|
-| `run()` | Entry point — snapshots `recipe_ingredient` facts as triggers, then forward-chains on each one |
-| `_forward_chain(*, trigger_fact)` | Core loop — finds matching rules for a trigger, resolves conflicts, fires via DFS; exhausts all matches using a while-loop with fired-set tracking. Returns `(any_rule_fired, last_derived_fact)` |
-| `_find_matching_rules(*, trigger_fact)` | Returns all `(rule, bindings)` pairs whose antecedents are satisfied, using `trigger_fact` as an anchor filter |
-| `_match_antecedents(*, antecedents, bindings)` | Recursively matches remaining antecedents against KB reference facts + WM facts; handles `NegatedFact` via negation-as-failure |
-| `_unify(*, pattern, fact, bindings)` | Pattern matching — unifies one antecedent pattern against one fact, binding `?variables`. Returns updated bindings or `None` on failure |
-| `_apply_bindings(*, fact_template, bindings)` | Substitutes `?variables` in a consequent template with concrete values from bindings |
-| `_fact_exists(*, fact)` | Duplicate check — returns `True` if an identical fact is already in working memory |
-| `_resolve_conflict(*, matches)` | Picks the best rule from candidates using priority (default) or specificity strategy |
-| `_fire_rule_dfs(*, rule, bindings)` | Fires a rule (runs `action_fn`, derives consequent, adds to WM), then DFS-chases any rules triggered by the derived fact |
+> [!NOTE]
+> 
+> Both the `Scaling Ingredients` and `Planning Scaled Recipe Steps` utilize pattern matching and binding of rule antecedent variables through unification against a Knowledge Based & Working Memory in order to derive new facts through rule consequents. Actual calculations or Working Memory modifications (ex: calculating the actual scaled value of a classified ingredient / transitioning an oven state from RESERVED to IN_USE) are triggered through rule `action functions` that also utilize the bindings of a matched and unified rule.
 
-#### Flow Diagram
+> [!NOTE]
+> 
+> Due to the complexities / struggles outlined above the planning engine is NOT run by default. The user must pass the --run_planning_engine script argument to enable planning. 
+> 
+> Further script augmentation is outlined in the specific [Submission Part](#submission-parts) documentation.
 
-```mermaid
-flowchart TD
-    A["run: begin scaling"] --> B["Snapshot all recipe ingredient facts as triggers"]
-    B --> C{"Any triggers remaining?"}
-    C -- Yes --> D["_forward_chain: process next trigger fact"]
-    C -- No --> Z["Scaling complete"]
-    D --> E["_find_matching_rules: search KB for rules matching trigger"]
-    E --> F{"Any rules matched?"}
-    F -- No --> G["Advance to next trigger"]
-    G --> C
-    F -- Yes --> H["Filter out rules already fired for this trigger"]
-    H --> I{"Any unfired matches left?"}
-    I -- No --> G
-    I -- Yes --> J["_resolve_conflict: pick best rule by priority or specificity"]
-    J --> K["_fire_rule_dfs: execute winning rule and chase derived facts"]
-    K --> E
+## [Part2 Assignment Answers](/DOCS/Part2.Answers.md)
 
-    style E fill:#e6d5f5,stroke:#333,color:#000
-    style K fill:#e6d5f5,stroke:#333,color:#000
-    style Z fill:#d4edda,stroke:#333,color:#000
-```
+## Submission Parts
 
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'lineColor': '#000000', 'edgeLabelBackground': '#000000', 'primaryTextColor': '#ffffff'}}}%%
-flowchart TD
-    classDef default color:#000
-    subgraph fire["_fire_rule_dfs: execute rule and DFS-chain"]
-        FR1["Execute action_fn side-effect if rule defines one"] --> FR2{"Does rule have a consequent?"}
-        FR2 -- "No consequent" --> FR10["Return None"]
-        FR2 -- "Yes" --> FR3["_apply_bindings: substitute ?variables into consequent template"]
-        FR3 --> FR4{"_fact_exists: is derived fact already in WM?"}
-        FR4 -- "New fact" --> FR5["Add derived fact to Working Memory"]
-        FR4 -- "Duplicate — skip add" --> FR6["DFS: _find_matching_rules using derived fact as new trigger"]
-        FR5 --> FR6
-        FR6 --> FR7{"Did the derived fact trigger any new rules?"}
-        FR7 -- Yes --> FR8["_resolve_conflict: pick best, then recurse into _fire_rule_dfs"]
-        FR8 --> FR6
-        FR7 -- No --> FR9["Return derived fact to caller"]
-    end
+### [Scaling Ingredients](/DOCS/scaling/1.Scaling.md)
 
-    subgraph find["_find_matching_rules: search for satisfied rules"]
-        FM1{"More KB rules to check?"} -- Yes --> FM2["_unify: try to bind trigger fact to each rule antecedent"]
-        FM2 --> FM3{"Does the trigger unify with an antecedent?"}
-        FM3 -- No --> FM1
-        FM3 -- Yes --> FM4["_match_antecedents: recursively match remaining antecedents against KB + WM facts"]
-        FM4 --> FM5["Collect valid rule, bindings pairs"]
-        FM5 --> FM1
-        FM1 -- "All rules checked" --> FM6["Return list of matched rules with their bindings"]
-    end
-
-    style fire fill:#e6d5f5,stroke:#333,color:#000
-    style find fill:#e6d5f5,stroke:#333,color:#000
-    style FR9 fill:#ffd700,stroke:#333,color:#000
-    style FR10 fill:#ffd700,stroke:#333,color:#000
-    style FM6 fill:#ffd700,stroke:#333,color:#000
-```
-
-### Planning
-
-The `PlanningEngine` is a forward-chaining production system that translates recipe steps into executable plans. It iterates over each recipe step, resolves required equipment, classifies the step type, and dispatches a `step_request` fact to specialized rules via forward chaining. Orchestration rules receive the engine instance via `bindings['_engine']`, enabling nested forward chaining and multi-level rule composition.
-
-#### Functions
-
-| Method | Purpose |
-|---|---|
-| `run(*, recipe)` | Entry point — iterates recipe steps, resolves equipment, builds `step_request` facts, forward-chains dispatch rules, handles GENERIC fallback. Returns `(success, plan_or_error)` |
-| `_resolve_equipment(*, equipment_need)` | Finds AVAILABLE equipment and reserves it; if none available, tries cleaning DIRTY equipment via rules. Returns resolved list or `None` on failure |
-| `_build_step_request(*, step, step_idx, resolved_equipment)` | Boundary translation — converts a recipe Step object into a `step_request` Fact with step_type classification and attribute-based overrides |
-| `_forward_chain(*, trigger_fact)` | Core loop — finds matching rules for a trigger, resolves conflicts by priority, fires via DFS; exhausts all matches with fired-set tracking. Returns `(any_rule_fired, last_derived_fact)` |
-| `_find_matching_rules(*, trigger_fact)` | Returns all `(rule, bindings)` pairs whose antecedents are satisfied, using `trigger_fact` as an anchor filter |
-| `_match_antecedents(*, antecedents, bindings)` | Recursively matches remaining antecedents against WM facts; handles `NegatedFact` via negation-as-failure |
-| `_unify(*, pattern, fact, bindings)` | Pattern matching — unifies one antecedent pattern against one fact, binding `?variables`. Returns updated bindings or `None` |
-| `_apply_bindings(*, fact_template, bindings)` | Substitutes `?variables` in a consequent template with concrete values from bindings |
-| `_fact_exists(*, fact)` | Duplicate check — returns `True` if an identical fact is already in working memory |
-| `_resolve_conflict(*, matches)` | Picks the highest-priority rule from candidates (priority-only, no specificity option) |
-| `_fire_rule_dfs(*, rule, bindings, plan_override=None)` | Fires a rule (injects `_engine`, runs `action_fn` with plan, derives consequent), then DFS-chases triggered rules. Supports `plan_override` for per-oven substep lists. Propagates errors via `?error` |
-
-#### Flow Diagram
-
-Purple boxes = functions detailed in Diagram 2 subgraphs.
-
-```mermaid
-flowchart TD
-    A["run: begin planning"] --> B["Initialize plan, recipe, and error state"]
-    B --> C{"Any recipe steps remaining?"}
-    C -- No --> Z["Planning complete — return (True, plan)"]
-    C -- Yes --> D["_resolve_equipment: resolve all equipment for next step"]
-    D --> E{"Equipment resolved successfully?"}
-    E -- No --> F["Return (False, equipment unavailable)"]
-    E -- Yes --> G["_build_step_request: classify step type and create step_request Fact"]
-    G --> H["Add step_request to Working Memory"]
-    H --> I["_find_matching_rules: search KB for dispatch rules matching step_request"]
-    I --> J{"Any rules matched?"}
-    J -- Yes --> K["Filter out rules already fired for this trigger"]
-    K --> L{"Any unfired matches left?"}
-    L -- Yes --> M["_resolve_conflict: pick best rule by priority"]
-    M --> N["_fire_rule_dfs: execute rule, inject _engine, chase derived facts"]
-    N --> NE{"Error from rule execution?"}
-    NE -- "Yes — break loop" --> O
-    NE -- No --> I
-    J -- No --> O
-    L -- No --> O
-    O{"self.last_error set?"}
-    O -- Yes --> P["Return (False, error message)"]
-    O -- No --> Q{"Non-GENERIC step with no rule fired?"}
-    Q -- Yes --> R["Return (False, no matching dispatch rule)"]
-    Q -- No --> S{"Is step_type GENERIC?"}
-    S -- "Yes — no dispatch rules" --> T["Transition equipment RESERVED → IN_USE, append step to plan"]
-    T --> U["Advance to next recipe step"]
-    S -- "No — dispatch rules handled it" --> U
-    U --> C
-
-    style D fill:#e6d5f5,stroke:#333,color:#000
-    style I fill:#e6d5f5,stroke:#333,color:#000
-    style N fill:#e6d5f5,stroke:#333,color:#000
-    style Z fill:#d4edda,stroke:#333,color:#000
-    style F fill:#ffd700,stroke:#333,color:#000
-    style P fill:#ffd700,stroke:#333,color:#000
-    style R fill:#ffd700,stroke:#333,color:#000
-```
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'lineColor': '#000000', 'edgeLabelBackground': '#000000', 'primaryTextColor': '#ffffff'}}}%%
-flowchart TD
-    classDef default color:#000
-    subgraph equip["_resolve_equipment: find and reserve equipment for a step"]
-        RE1{"Any equipment needs remaining?"} -- Yes --> RE2["Query WM for AVAILABLE equipment by name"]
-        RE2 --> RE3{"Found AVAILABLE?"}
-        RE3 -- "Yes" --> RE4["Set state → RESERVED, add to resolved list"]
-        RE4 --> RE1
-        RE3 -- "No" --> RE5["Query WM for DIRTY equipment by name"]
-        RE5 --> RE6{"Found DIRTY?"}
-        RE6 -- "Yes" --> RE7["Fire cleaning rule: _find_matching_rules + _fire_rule_dfs"]
-        RE7 --> RE8["Equipment cleaned → RESERVED, add to resolved list"]
-        RE8 --> RE1
-        RE6 -- "No — insufficient equipment" --> RE9["Return None (failure)"]
-        RE1 -- "All needs met" --> RE10["Return resolved equipment list"]
-    end
-
-    style equip fill:#e6d5f5,stroke:#333,color:#000
-    style RE9 fill:#ffd700,stroke:#333,color:#000
-    style RE10 fill:#ffd700,stroke:#333,color:#000
-```
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'lineColor': '#000000', 'edgeLabelBackground': '#000000', 'primaryTextColor': '#ffffff'}}}%%
-flowchart TD
-    classDef default color:#000
-    subgraph find["_find_matching_rules: search for satisfied rules"]
-        FM1{"More KB rules to check?"} -- Yes --> FM2["_unify: try binding trigger fact to each positive antecedent"]
-        FM2 --> FM3{"Does the trigger unify with an antecedent?"}
-        FM3 -- No --> FM1
-        FM3 -- Yes --> FM4["_match_antecedents: recursively match remaining antecedents against WM facts"]
-        FM4 --> FM5["Collect valid rule, bindings pairs"]
-        FM5 --> FM1
-        FM1 -- "All rules checked" --> FM6["Return list of matched rules with their bindings"]
-    end
-
-    style find fill:#e6d5f5,stroke:#333,color:#000
-    style FM6 fill:#ffd700,stroke:#333,color:#000
-```
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': {'lineColor': '#000000', 'edgeLabelBackground': '#000000', 'primaryTextColor': '#ffffff'}}}%%
-flowchart TD
-    classDef default color:#000
-    subgraph fire["_fire_rule_dfs: execute rule with error handling and DFS-chain"]
-        FR0["Seed bindings: _engine = self for orchestration rule callbacks"] --> FR1
-        FR1["Execute action_fn if present — passes plan list and engine reference"] --> FR1E{"?error in bindings?"}
-        FR1E -- "Yes — error signaled" --> FR10["Set self.last_error, return None"]
-        FR1E -- "No" --> FR2{"Does rule have a consequent?"}
-        FR2 -- "No consequent" --> FR11["Return None"]
-        FR2 -- "Yes" --> FR3["_apply_bindings: substitute ?variables into consequent template"]
-        FR3 --> FR4{"_fact_exists: is derived fact already in WM?"}
-        FR4 -- "New fact" --> FR5["Add derived fact to Working Memory"]
-        FR4 -- "Duplicate — skip add" --> FR6
-        FR5 --> FR6["DFS: _find_matching_rules using derived fact as new trigger"]
-        FR6 --> FR7{"Did the derived fact trigger any new rules?"}
-        FR7 -- Yes --> FR8["Pick best by priority, recurse into _fire_rule_dfs with plan_override"]
-        FR8 --> FR6
-        FR7 -- No --> FR9["Return derived fact to caller"]
-    end
-
-    style fire fill:#e6d5f5,stroke:#333,color:#000
-    style FR9 fill:#ffd700,stroke:#333,color:#000
-    style FR10 fill:#ffd700,stroke:#333,color:#000
-    style FR11 fill:#ffd700,stroke:#333,color:#000
-```
-
-## Running Tests
-
-```bash
-make test
-```
+### [Planning Scaled Recipe Steps](/DOCS/planning/2.Planning.md)

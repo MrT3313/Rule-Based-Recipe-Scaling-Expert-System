@@ -44,12 +44,40 @@ if __name__ == "__main__":
         help="Conflict resolution strategy",
     )
 
+    # parser.add_argument(
+    #     "--planning_conflict_resolution",
+    #     type=str,
+    #     default="priority",
+    #     choices=["priority"],
+    #     help="Conflict resolution strategy",
+    # )
+
     parser.add_argument(
-        "--planning_conflict_resolution",
-        type=str,
-        default="priority",
-        choices=["priority"],
-        help="Conflict resolution strategy",
+        "--num_ovens",
+        type=int,
+        default=4,
+        help="Number of ovens",
+    )
+
+    parser.add_argument(
+        "--num_bowls",
+        type=int,
+        default=1,
+        help="Number of bowls",
+    )
+
+    parser.add_argument(
+        "--num_baking_sheets",
+        type=int,
+        default=5,
+        help="Number of baking sheets",
+    )
+
+    parser.add_argument(
+        "--run_planning_engine",
+        action="store_true",
+        default=False,
+        help="Run planning engine",
     )
 
     parser.add_argument(
@@ -93,6 +121,7 @@ if __name__ == "__main__":
     scaling.main.main(wm=wm, kb=kb, recipe=recipe, args=args)
 
     # SCALING > results #######################################################
+    print("")
     classified_ingredients = [f for f in wm.facts if f.fact_title == 'classified_ingredient']
     print(f"Classified ingredients: {len(classified_ingredients)}")
     for fact in classified_ingredients:
@@ -159,19 +188,20 @@ if __name__ == "__main__":
         print(f"\t{fact}")
     print("")
 
-    # PLANNING ################################################################
-    success, plan = planning.main.main(wm=wm, kb=kb, recipe=recipe, args=args)
+    if args.run_planning_engine:
+        # PLANNING ################################################################
+        success, plan = planning.main.main(wm=wm, kb=kb, recipe=recipe, args=args)
 
-    # PLANNING > results ######################################################
-    if not success:
-        print(f"\n❌ Planning failed: {plan}")
-    else:
-        print(f"\n✅ Planning complete — {len(plan)} action(s) in plan")
+        # PLANNING > results ######################################################
+        if not success:
+            print(f"\n❌ Planning failed: {plan}")
+        else:
+            print(f"\n✅ Planning complete — {len(plan)} action(s) in plan")
 
-        if args.explain:
-            explanation = ExplanationFacility(wm=wm, kb=kb, label="Combined")
-            explanation.run_repl()
+            if args.explain:
+                explanation = ExplanationFacility(wm=wm, kb=kb, label="Combined")
+                explanation.run_repl()
 
-        print_plan(plan=plan)
+            print_plan(plan=plan)
 
 

@@ -79,7 +79,7 @@ def main(*, wm, kb, recipe, args):
     print("*"*70)
     print("")
 
-    for idx in range(3):
+    for idx in range(args.num_ovens):
         wm.add_fact(fact=Fact(
             fact_title='EQUIPMENT',
             equipment_type='APPLIANCE',
@@ -89,17 +89,18 @@ def main(*, wm, kb, recipe, args):
             number_of_racks=2,
         ), silent=True)
 
-    wm.add_fact(fact=Fact(
-        fact_title='EQUIPMENT',
-        equipment_type='CONTAINER',
-        equipment_name='BOWL',
-        equipment_id=1,
-        state='AVAILABLE',
-        volume=4,
-        volume_unit='QUARTS',
-    ), silent=True)
+    for idx in range(args.num_bowls):
+        wm.add_fact(fact=Fact(
+            fact_title='EQUIPMENT',
+            equipment_type='CONTAINER',
+            equipment_name='BOWL',
+            equipment_id=idx,
+            state='AVAILABLE',
+            volume=4,
+            volume_unit='QUARTS',
+        ), silent=True)
 
-    for idx in range(5):
+    for idx in range(args.num_baking_sheets):
         wm.add_fact(fact=Fact(
             fact_title='EQUIPMENT',
             equipment_type='TRAY',
