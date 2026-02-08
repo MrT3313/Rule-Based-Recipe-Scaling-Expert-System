@@ -39,9 +39,6 @@ def main(*, wm, kb, recipe, args):
     optimal_unit_conversion_rules = get_optimal_unit_conversion_rules()
     kb.add_rules(rules=optimal_unit_conversion_rules)
 
-    print(f"Configured Knowledge Base size: {len(kb.reference_facts)} reference facts & {len(kb.rules)} rules")
-    print("")
-
     print("*"*70)
     print("⚙️⚙️ CONFIGURE WORKING MEMORY ⚙️⚙️")
     print("*"*70)
@@ -65,75 +62,3 @@ def main(*, wm, kb, recipe, args):
 
     SCALING_ENGINE = ScalingEngine(wm=wm, kb=kb, conflict_resolution_strategy=args.scaling_conflict_resolution, verbose=True)
     SCALING_ENGINE.run()
-
-    print("")
-    print("*"*70)
-    print("🎉🎉 FINAL SCALING RESULTS 🎉 🎉")
-    print("*"*70)
-    print("")
-
-    classified_ingredients = [f for f in wm.facts if f.fact_title == 'classified_ingredient']
-    print(f"Classified ingredients: {len(classified_ingredients)}")
-    for fact in classified_ingredients:
-        print(f"\t{fact}")
-    print("")
-
-    scaling_multipliers = [f for f in wm.facts if f.fact_title == 'ingredient_scaling_multiplier']
-    print(f"Ingredient scaling multipliers: {len(scaling_multipliers)}")
-    for fact in scaling_multipliers:
-        print(f"\t{fact}")
-    print("")
-
-    scaled_ingredients = [f for f in wm.facts if f.fact_title == 'scaled_ingredient']
-    print(f"Scaled ingredients: {len(scaled_ingredients)}")
-    for fact in scaled_ingredients:
-        name = fact.get(key='ingredient_name')
-        original = fact.get(key='original_amount')
-        scaled = fact.get(key='scaled_amount')
-        unit = fact.get(key='unit')
-        multiplier = fact.get(key='scaling_multiplier')
-        print(f"\t{name}: {original} → {scaled:.2f} {unit} (×{multiplier:.2f})")
-    print("")
-
-    optimal_ingredients = [f for f in wm.facts if f.fact_title == 'optimally_scaled_ingredient']
-    print(f"Optimal ingredients: {len(optimal_ingredients)}")
-    for fact in optimal_ingredients:
-        name = fact.get(key='ingredient_name')
-        components = fact.get(key='components')
-        original_amount = fact.get(key='original_amount')
-        original_unit = fact.get(key='original_unit')
-
-        if components:
-            conversion_happened = False
-
-            if len(components) == 1:
-                if components[0]['unit'] != original_unit:
-                    conversion_happened = True
-            else:
-                conversion_happened = True
-
-            if len(components) > 1:
-                parts = [f"{c['amount']:.4g} {c['unit']}" for c in components]
-                display = " + ".join(parts)
-                if conversion_happened:
-                    print(f"\t{name}: {display} (converted from {original_amount:.4g} {original_unit})")
-                else:
-                    print(f"\t{name}: {display}")
-            else:
-                amount = components[0]['amount']
-                unit = components[0]['unit']
-                if conversion_happened:
-                    print(f"\t{name}: {amount:.4g} {unit} (converted from {original_amount:.4g} {original_unit})")
-                else:
-                    print(f"\t{name}: {amount:.4g} {unit}")
-        else:
-            print(f"\t{name}: [no components]")
-    print("")
-
-    print("*"*70)
-    print(f"ALL FACTS IN WORKING MEMORY: {len(wm.facts)}")
-    print("*"*70)
-    print("")
-    for fact in wm.facts:
-        print(f"\t{fact}")
-    print("")

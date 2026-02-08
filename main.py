@@ -89,9 +89,80 @@ if __name__ == "__main__":
         silent=True
     )
 
+    # SCALING #################################################################
     scaling.main.main(wm=wm, kb=kb, recipe=recipe, args=args)
+
+    # SCALING > results #######################################################
+    classified_ingredients = [f for f in wm.facts if f.fact_title == 'classified_ingredient']
+    print(f"Classified ingredients: {len(classified_ingredients)}")
+    for fact in classified_ingredients:
+        print(f"\t{fact}")
+    print("")
+
+    scaling_multipliers = [f for f in wm.facts if f.fact_title == 'ingredient_scaling_multiplier']
+    print(f"Ingredient scaling multipliers: {len(scaling_multipliers)}")
+    for fact in scaling_multipliers:
+        print(f"\t{fact}")
+    print("")
+
+    scaled_ingredients = [f for f in wm.facts if f.fact_title == 'scaled_ingredient']
+    print(f"Scaled ingredients: {len(scaled_ingredients)}")
+    for fact in scaled_ingredients:
+        name = fact.get(key='ingredient_name')
+        original = fact.get(key='original_amount')
+        scaled = fact.get(key='scaled_amount')
+        unit = fact.get(key='unit')
+        multiplier = fact.get(key='scaling_multiplier')
+        print(f"\t{name}: {original} → {scaled:.2f} {unit} (×{multiplier:.2f})")
+    print("")
+
+    optimal_ingredients = [f for f in wm.facts if f.fact_title == 'optimally_scaled_ingredient']
+    print(f"Optimal ingredients: {len(optimal_ingredients)}")
+    for fact in optimal_ingredients:
+        name = fact.get(key='ingredient_name')
+        components = fact.get(key='components')
+        original_amount = fact.get(key='original_amount')
+        original_unit = fact.get(key='original_unit')
+
+        if components:
+            conversion_happened = False
+
+            if len(components) == 1:
+                if components[0]['unit'] != original_unit:
+                    conversion_happened = True
+            else:
+                conversion_happened = True
+
+            if len(components) > 1:
+                parts = [f"{c['amount']:.4g} {c['unit']}" for c in components]
+                display = " + ".join(parts)
+                if conversion_happened:
+                    print(f"\t{name}: {display} (converted from {original_amount:.4g} {original_unit})")
+                else:
+                    print(f"\t{name}: {display}")
+            else:
+                amount = components[0]['amount']
+                unit = components[0]['unit']
+                if conversion_happened:
+                    print(f"\t{name}: {amount:.4g} {unit} (converted from {original_amount:.4g} {original_unit})")
+                else:
+                    print(f"\t{name}: {amount:.4g} {unit}")
+        else:
+            print(f"\t{name}: [no components]")
+    print("")
+
+    print("*" * 70)
+    print(f"ALL FACTS IN WORKING MEMORY: {len(wm.facts)}")
+    print("*" * 70)
+    print("")
+    for fact in wm.facts:
+        print(f"\t{fact}")
+    print("")
+
+    # PLANNING ################################################################
     success, plan = planning.main.main(wm=wm, kb=kb, recipe=recipe, args=args)
 
+    # PLANNING > results ######################################################
     if not success:
         print(f"\n❌ Planning failed: {plan}")
     else:
