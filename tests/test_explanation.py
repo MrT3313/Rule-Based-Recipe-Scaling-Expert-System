@@ -15,7 +15,7 @@ def _make_engine(*, wm_facts=None, kb_rules=None, kb_ref_facts=None):
     for f in (wm_facts or []):
         wm.add_fact(fact=f, silent=True)
     if kb_ref_facts:
-        kb.add_reference_fact(fact=kb_ref_facts)
+        kb.add_reference_facts(facts=kb_ref_facts)
     if kb_rules:
         kb.add_rules(rules=kb_rules)
     return ScalingEngine(wm=wm, kb=kb, verbose=False)
@@ -184,7 +184,7 @@ class TestExplanationFacility:
         wm = WorkingMemory()
         kb = KnowledgeBase()
         ref = Fact(fact_title='conversion', from_unit='CUP', to_unit='TBSP', factor=16)
-        kb.add_reference_fact(fact=[ref])
+        kb.add_reference_facts(facts=[ref])
         # Create an identical fact in WM
         wm_fact = Fact(fact_title='conversion', from_unit='CUP', to_unit='TBSP', factor=16)
         wm.add_fact(fact=wm_fact, silent=True)

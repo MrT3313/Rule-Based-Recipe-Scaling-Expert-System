@@ -1,19 +1,21 @@
 import argparse
 
-from recipes.chocolate_chip_cookies import chocolate_chip_cookies_recipe
-from classes.KnowledgeBase import KnowledgeBase
-from classes.WorkingMemory import WorkingMemory
-
+# modules
 import scaling.main
 import planning.main
 
-if __name__ == "__main__":
-    print("*"*70)
-    print("FORWARD-CHAINING PRODUCTION SYSTEM: Recipe Scaling")
-    print("*"*70)
-    print("")
+# classes
+from recipes.chocolate_chip_cookies import chocolate_chip_cookies_recipe
+from classes.KnowledgeBase import KnowledgeBase
+from classes.WorkingMemory import WorkingMemory
+from classes.Fact import Fact
+from classes.ExplanationFacility import ExplanationFacility
 
-    print("PARSING ARGUMENTS...")
+# utils
+from utils.print_plan import print_plan
+
+if __name__ == "__main__":
+    # parse arguments
     parser = argparse.ArgumentParser(
         description="Runs First-Order Logic inference algorithms on a Knowledge Base.",
         formatter_class=argparse.RawTextHelpFormatter,
@@ -35,10 +37,18 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--conflict_resolution",
+        "--scaling_conflict_resolution",
         type=str,
         default="priority",
         choices=["priority", "specificity"],
+        help="Conflict resolution strategy",
+    )
+
+    parser.add_argument(
+        "--planning_conflict_resolution",
+        type=str,
+        default="priority",
+        choices=["priority"],
         help="Conflict resolution strategy",
     )
 
@@ -52,7 +62,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print("")
 
-    print("LOADING RECIPE...")
     if args.recipe == "chocolate_chip_cookies":
         recipe = chocolate_chip_cookies_recipe
     else:
@@ -61,14 +70,37 @@ if __name__ == "__main__":
     print("")
 
     print("*"*70)
-    print(f"CHOSEN RECIPE: {args.recipe}")
-    print(f"SCALING FACTOR: {args.scaling_factor}x")
-    print(f"CONFLICT RESOLUTION: {args.conflict_resolution}")
+    print("RULE BASED DEPTH FIRST EXPERT SYSTEM FOR RECIPE SCALING")
+    print(f"Chosen Recipe: {args.recipe}")
+    print(f"Scaling Factor: {args.scaling_factor}x")
+    print(f"Conflict Resolution (Scaling): {args.scaling_conflict_resolution}")
+    print(f"Conflict Resolution (Planning): {args.planning_conflict_resolution}")
     print("*"*70)
     print("")
 
     kb = KnowledgeBase()
     wm = WorkingMemory()
 
+    wm.add_fact(
+        fact=Fact(
+            fact_title='target_recipe_scale_factor',
+            target_recipe_scale_factor=args.scaling_factor
+        ),
+        silent=True
+    )
+
     scaling.main.main(wm=wm, kb=kb, recipe=recipe, args=args)
-    planning.main.main(wm=wm, kb=kb, recipe=recipe, args=args)
+    success, plan = planning.main.main(wm=wm, kb=kb, recipe=recipe, args=args)
+
+    if not success:
+        print(f"\n❌ Planning failed: {plan}")
+    else:
+        print(f"\n✅ Planning complete — {len(plan)} action(s) in plan")
+
+        if args.explain:
+            explanation = ExplanationFacility(wm=wm, kb=kb, label="Combined")
+            explanation.run_repl()
+
+        print_plan(plan)
+
+

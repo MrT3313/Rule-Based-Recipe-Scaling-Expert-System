@@ -13,8 +13,8 @@ def _make_engine(*, ingredient_name, amount=1, unit='TEASPOONS', measurement_cat
     wm = WorkingMemory()
     kb = KnowledgeBase()
 
-    kb.add_reference_fact(fact=get_ingredient_classification_facts())
-    kb.add_reference_fact(fact=get_ingredient_classification_scale_factor_facts())
+    kb.add_reference_facts(facts=get_ingredient_classification_facts())
+    kb.add_reference_facts(facts=get_ingredient_classification_scale_factor_facts())
     kb.add_rules(rules=get_ingredient_classification_rules())
 
     wm.add_fact(fact=Fact(

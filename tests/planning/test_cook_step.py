@@ -76,8 +76,8 @@ def _make_engine(*, ingredients, substeps, bowl_volume=4, bowl_volume_unit='QUAR
     kb.add_rules(rules=get_surface_transfer_dispatch_rules())
     kb.add_rules(rules=get_equipment_transfer_dispatch_rules())
     kb.add_rules(rules=get_cook_dispatch_rules())
-    kb.add_reference_fact(fact=get_measurement_unit_conversion_facts())
-    kb.add_reference_fact(fact=get_transfer_reference_facts())
+    kb.add_reference_facts(facts=get_measurement_unit_conversion_facts())
+    kb.add_reference_facts(facts=get_transfer_reference_facts())
 
     steps = [
         MixingStep(

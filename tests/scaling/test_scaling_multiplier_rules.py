@@ -15,8 +15,8 @@ def _make_engine(*, ingredient_name, scale_factor=2.0,
     wm = WorkingMemory()
     kb = KnowledgeBase()
 
-    kb.add_reference_fact(fact=get_ingredient_classification_facts())
-    kb.add_reference_fact(fact=get_ingredient_classification_scale_factor_facts())
+    kb.add_reference_facts(facts=get_ingredient_classification_facts())
+    kb.add_reference_facts(facts=get_ingredient_classification_scale_factor_facts())
     kb.add_rules(rules=get_ingredient_classification_rules())
     kb.add_rules(rules=get_ingredient_classification_scaling_multiplier_rules())
 

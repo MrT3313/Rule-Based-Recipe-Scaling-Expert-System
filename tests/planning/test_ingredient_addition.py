@@ -43,7 +43,7 @@ def _make_engine(*, bowl_volume=4, bowl_volume_unit='QUARTS', ingredients, subst
     kb.add_rules(rules=get_surface_transfer_dispatch_rules())
     kb.add_rules(rules=get_equipment_transfer_dispatch_rules())
     kb.add_rules(rules=get_cook_dispatch_rules())
-    kb.add_reference_fact(fact=get_measurement_unit_conversion_facts())
+    kb.add_reference_facts(facts=get_measurement_unit_conversion_facts())
 
     recipe = Recipe(
         name='Test Recipe',

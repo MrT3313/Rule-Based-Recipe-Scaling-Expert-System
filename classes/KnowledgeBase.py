@@ -8,6 +8,6 @@ class KnowledgeBase:
         """Add a rule to the knowledge base"""
         self.rules.extend(rules)
 
-    def add_reference_fact(self, *, fact):
+    def add_reference_facts(self, *, facts):
         """Add permanent domain knowledge"""
-        self.reference_facts.extend(fact)
+        self.reference_facts.extend(facts)

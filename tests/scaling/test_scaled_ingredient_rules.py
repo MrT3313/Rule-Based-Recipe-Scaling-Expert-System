@@ -16,8 +16,8 @@ def _make_engine(*, ingredient_name, amount, unit='CUPS',
     wm = WorkingMemory()
     kb = KnowledgeBase()
 
-    kb.add_reference_fact(fact=get_ingredient_classification_facts())
-    kb.add_reference_fact(fact=get_ingredient_classification_scale_factor_facts())
+    kb.add_reference_facts(facts=get_ingredient_classification_facts())
+    kb.add_reference_facts(facts=get_ingredient_classification_scale_factor_facts())
     kb.add_rules(rules=get_ingredient_classification_rules())
     kb.add_rules(rules=get_ingredient_classification_scaling_multiplier_rules())
     kb.add_rules(rules=get_scaled_ingredient_rules())

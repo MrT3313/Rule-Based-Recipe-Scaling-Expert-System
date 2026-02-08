@@ -7,17 +7,17 @@ class ExplanationFacility:
     def run_repl(self):
         print("")
         print("=" * 70)
-        print(f"  EXPLANATION FACILITY ({self.label})")
+        print(f"EXPLANATION FACILITY ({self.label})")
         print("=" * 70)
         print("")
-        print("Facts in working memory:")
+        print(f"Facts in working memory: {len(self.wm.facts)}")
         for fact in self.wm.facts:
-            print(f"  #{fact.fact_id}  {fact}")
+            print(f"\t{fact}")
         print("")
 
         while True:
             try:
-                user_input = input("Enter a fact number to explain (or 'c' to continue): ").strip()
+                user_input = input(f"🔎🔎 {self.label.upper()} ENGINE EXPLANATION FACILITY 🔎🔎\n{len(self.wm.facts)} Working Memory Facts\nEnter a fact number to explain (or 'c' to continue): ").strip()
             except (EOFError, KeyboardInterrupt):
                 print("")
                 break
@@ -47,7 +47,7 @@ class ExplanationFacility:
         return None
 
     def _print_derivation(self, fact, indent=0):
-        prefix = "    " * indent
+        prefix = "\t" * indent
         connector = "+-- " if indent > 0 else ""
 
         if fact.derivation is None:

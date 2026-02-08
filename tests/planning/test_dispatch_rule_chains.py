@@ -97,8 +97,8 @@ def _make_full_pipeline_engine(*, ingredients, substeps,
     kb.add_rules(rules=get_surface_transfer_dispatch_rules())
     kb.add_rules(rules=get_equipment_transfer_dispatch_rules())
     kb.add_rules(rules=get_cook_dispatch_rules())
-    kb.add_reference_fact(fact=get_measurement_unit_conversion_facts())
-    kb.add_reference_fact(fact=get_transfer_reference_facts())
+    kb.add_reference_facts(facts=get_measurement_unit_conversion_facts())
+    kb.add_reference_facts(facts=get_transfer_reference_facts())
 
     steps = [
         MixingStep(
