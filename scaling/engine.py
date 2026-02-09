@@ -8,6 +8,7 @@ class ScalingEngine:
         self.knowledge_base = kb
         self.conflict_resolution_strategy = conflict_resolution_strategy
         self.verbose = verbose
+        self.cycle = 0
 
     def run(self):
         # Snapshot recipe_ingredient facts — these are the triggers
@@ -22,11 +23,23 @@ class ScalingEngine:
         """Find matching rules for a trigger fact, resolve conflict, fire via DFS.
         Uses a while-loop to exhaust all matches for the trigger.
         Returns (any_rule_fired, last_derived_fact)."""
+        self.cycle += 1
         last_derived = None
         any_rule_fired = False
         fired = set()
 
+        print("")
+        print(f'🔁 CYCLE: {self.cycle}')
+        print(f'🧠 CURRENT WORKING MEMORY ({len(self.working_memory.facts)})\n')
+        for fact in self.working_memory.facts:
+            print(f"\t{fact}")
+        print('###############################################################################')
+
         matches = self._find_matching_rules(trigger_fact=trigger_fact)
+        print("")
+        print(f"🧠 Matches Found {len(matches)}")
+        if not matches:
+            print(f"No rules matched trigger - nothing new added to working memory")
         while matches:
             wm_size = len(self.working_memory.facts)
 
@@ -59,6 +72,8 @@ class ScalingEngine:
 
             # Re-evaluate: new facts may have changed what matches
             matches = self._find_matching_rules(trigger_fact=trigger_fact)
+            print("")
+            print(f"🧠 Matches Found {len(matches)}")
 
         return (any_rule_fired, last_derived)
 
@@ -68,13 +83,18 @@ class ScalingEngine:
         positive antecedent unifies with the trigger."""
         matches = []
         for rule in self.knowledge_base.rules:
+            print("")
+            print(f'👀 Attempting to match: \trule "{rule.rule_name}" 👉 fact "{trigger_fact.fact_title}"')
+
             for ant_idx, antecedent in enumerate(rule.antecedents):
                 if isinstance(antecedent, NegatedFact):
                     continue
 
                 initial_bindings = self._unify(pattern=antecedent, fact=trigger_fact, bindings={})
                 if initial_bindings is None:
-                    continue
+                    print(f'❌ Match Failed')
+                    break
+                    # continue
 
                 initial_bindings['_matched_facts'] = [trigger_fact]
 
@@ -82,8 +102,11 @@ class ScalingEngine:
                 # Match remaining antecedents against all KB + WM facts.
                 remaining = rule.antecedents[:ant_idx] + rule.antecedents[ant_idx + 1:]
                 bindings_list = self._match_antecedents(antecedents=remaining, bindings=initial_bindings)
+                if not bindings_list:
+                    print(f'❌ Match Failed')
                 for bindings in bindings_list:
                     if (rule, bindings) not in matches:
+                        print(f'✅ Match succeeded')
                         matches.append((rule, bindings))
                 break  # Only anchor to first matching antecedent per rule
 
@@ -184,16 +207,23 @@ class ScalingEngine:
             derived = self._apply_bindings(fact_template=rule.consequent, bindings=bindings)
             if not self._fact_exists(fact=derived):
                 derived.derivation = derivation
-                self.working_memory.add_fact(fact=derived, silent=not self.verbose)
 
                 if self.verbose:
                     print(f"[Rule fired] {rule.rule_name} -> {derived}")
+
+                self.working_memory.add_fact(fact=derived, silent=not self.verbose)
+            else:
+                if self.verbose:
+                    print(f"[Rule fired] {rule.rule_name} -> No new WM assertions (fact already exists)")
 
             self.working_memory._current_derivation = prev_derivation
 
             # DFS: chase rules triggered by the derived fact
             fired = set()
             chain_matches = self._find_matching_rules(trigger_fact=derived)
+
+            print("")
+            print(f"🧠 Matches Found {len(chain_matches)}")
             while chain_matches:
                 wm_size = len(self.working_memory.facts)
 
@@ -221,8 +251,12 @@ class ScalingEngine:
                 self._fire_rule_dfs(rule=best_chain_rule, bindings=best_chain_bindings)
 
                 chain_matches = self._find_matching_rules(trigger_fact=derived)
+                print("")
+                print(f"🧠 Matches Found {len(chain_matches)}")
 
             return derived
+        else:
+            print(f"👀 No new WM assertions")
 
         self.working_memory._current_derivation = prev_derivation
         return None

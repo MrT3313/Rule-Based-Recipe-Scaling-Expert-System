@@ -102,7 +102,7 @@ if __name__ == "__main__":
     print(f"Chosen Recipe: {args.recipe}")
     print(f"Scaling Factor: {args.scaling_factor}x")
     print(f"Conflict Resolution (Scaling): {args.scaling_conflict_resolution}")
-    print(f"Conflict Resolution (Planning): {args.planning_conflict_resolution}")
+    # print(f"Conflict Resolution (Planning): {args.planning_conflict_resolution}")
     print("*"*70)
     print("")
 

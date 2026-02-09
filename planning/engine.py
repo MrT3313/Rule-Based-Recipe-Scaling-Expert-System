@@ -7,6 +7,7 @@ class PlanningEngine:
         self.working_memory = wm
         self.knowledge_base = kb
         self.verbose = verbose
+        self.cycle = 0
 
     def run(self, *, recipe):
         self.plan = []
@@ -120,11 +121,23 @@ class PlanningEngine:
         Uses a while-loop to exhaust all matches for the trigger (e.g., T1 fires
         once per mixed_contents source). Returns (rule_fired, last_derived_fact).
         Sets self.last_error on failure."""
+        self.cycle += 1
         last_derived = None
         any_rule_fired = False
         fired = set()
 
+        print("")
+        print(f'🔁 CYCLE: {self.cycle}')
+        print(f'🧠 CURRENT WORKING MEMORY ({len(self.working_memory.facts)})\n')
+        for fact in self.working_memory.facts:
+            print(f"\t{fact}")
+        print('###############################################################################')
+
         matches = self._find_matching_rules(trigger_fact=trigger_fact)
+        print("")
+        print(f"🧠 Matches Found {len(matches)}")
+        if not matches:
+            print(f"No rules matched trigger - nothing new added to working memory")
         while matches:
             if self.last_error:
                 break
@@ -170,6 +183,8 @@ class PlanningEngine:
 
             # Re-evaluate: new facts may have changed what matches
             matches = self._find_matching_rules(trigger_fact=trigger_fact)
+            print("")
+            print(f"🧠 Matches Found {len(matches)}")
 
         return (any_rule_fired, last_derived)
 
@@ -248,6 +263,9 @@ class PlanningEngine:
         matching, but anchor one antecedent to the trigger fact specifically."""
         matches = []
         for rule in self.knowledge_base.rules:
+            print("")
+            print(f'👀 Attempting to match: \trule "{rule.rule_name}" 👉 fact "{trigger_fact.fact_title}"')
+
             # Find which positive antecedent(s) unify with trigger_fact
             for ant_idx, antecedent in enumerate(rule.antecedents):
                 if isinstance(antecedent, NegatedFact):
@@ -255,7 +273,9 @@ class PlanningEngine:
 
                 initial_bindings = self._unify(pattern=antecedent, fact=trigger_fact, bindings={})
                 if initial_bindings is None:
-                    continue
+                    print(f'❌ Match Failed')
+                    break
+                    # continue
 
                 initial_bindings['_matched_facts'] = [trigger_fact]
 
@@ -263,9 +283,12 @@ class PlanningEngine:
                 # Match remaining antecedents against all WM facts.
                 remaining = rule.antecedents[:ant_idx] + rule.antecedents[ant_idx + 1:]
                 bindings_list = self._match_antecedents(antecedents=remaining, bindings=initial_bindings)
+                if not bindings_list:
+                    print(f'❌ Match Failed')
                 for bindings in bindings_list:
                     # Deduplicate: avoid adding the same bindings twice
                     if (rule, bindings) not in matches:
+                        print(f'✅ Match succeeded')
                         matches.append((rule, bindings))
                 break  # Only anchor to first matching antecedent per rule
 
@@ -344,7 +367,14 @@ class PlanningEngine:
             derived = self._apply_bindings(fact_template=rule.consequent, bindings=bindings)
             if not self._fact_exists(fact=derived):
                 derived.derivation = derivation
-                self.working_memory.add_fact(fact=derived)
+
+                if self.verbose:
+                    print(f"[Rule fired] {rule.rule_name} -> {derived}")
+
+                self.working_memory.add_fact(fact=derived, silent=not self.verbose)
+            else:
+                if self.verbose:
+                    print(f"[Rule fired] {rule.rule_name} -> No new WM assertions (fact already exists)")
 
             self.working_memory._current_derivation = prev_derivation
 
@@ -354,6 +384,8 @@ class PlanningEngine:
             # WM changes (the negated guard may flip), so include wm_size in their key.
             fired = set()
             chain_matches = self._find_matching_rules(trigger_fact=derived)
+            print("")
+            print(f"🧠 Matches Found {len(chain_matches)}")
             while chain_matches:
                 if self.last_error:
                     break
@@ -396,8 +428,12 @@ class PlanningEngine:
 
                 # Re-evaluate: new facts may enable new matches for the derived trigger
                 chain_matches = self._find_matching_rules(trigger_fact=derived)
+                print("")
+                print(f"🧠 Matches Found {len(chain_matches)}")
 
             return derived
+        else:
+            print(f"👀 No new WM assertions")
 
         self.working_memory._current_derivation = prev_derivation
         return None
