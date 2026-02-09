@@ -197,11 +197,12 @@ if __name__ == "__main__":
             print(f"\n❌ Planning failed: {plan}")
         else:
             print(f"\n✅ Planning complete — {len(plan)} action(s) in plan")
+            print_plan(plan=plan)
     # EXPLANATION #############################################################
     if args.explain:
         explanation = ExplanationFacility(wm=wm, kb=kb, label="Combined")
         explanation.run_repl()
 
-    print_plan(plan=plan)
+
 
 
