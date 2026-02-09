@@ -189,19 +189,19 @@ if __name__ == "__main__":
     print("")
 
     if args.run_planning_engine:
-        # PLANNING ################################################################
+        # PLANNING ############################################################
         success, plan = planning.main.main(wm=wm, kb=kb, recipe=recipe, args=args)
 
-        # PLANNING > results ######################################################
+        # PLANNING > results ##################################################
         if not success:
             print(f"\n❌ Planning failed: {plan}")
         else:
             print(f"\n✅ Planning complete — {len(plan)} action(s) in plan")
+    # EXPLANATION #############################################################
+    if args.explain:
+        explanation = ExplanationFacility(wm=wm, kb=kb, label="Combined")
+        explanation.run_repl()
 
-            if args.explain:
-                explanation = ExplanationFacility(wm=wm, kb=kb, label="Combined")
-                explanation.run_repl()
-
-            print_plan(plan=plan)
+    print_plan(plan=plan)
 
 
