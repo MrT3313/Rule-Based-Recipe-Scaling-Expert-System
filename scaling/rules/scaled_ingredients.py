@@ -35,6 +35,7 @@ def get_scaled_ingredient_rules():
                            scaling_multiplier='?scaling_multiplier'),
             # action function to calculate scaled ingredient amount based on consequent bindings
             action_fn=lambda *, bindings, wm, kb: {
+                **bindings,
                 '?scaled_amount': bindings['?original_amount'] * bindings['?scaling_multiplier']
             },
         )

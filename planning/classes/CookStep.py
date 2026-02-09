@@ -1,0 +1,8 @@
+from planning.classes.Step import Step
+
+
+class CookStep(Step):
+    step_type = 'COOK'
+
+    def __init__(self, *, description, required_equipment=[], substeps=[], is_passive=False):
+        super().__init__(description=description, required_equipment=required_equipment, substeps=substeps, is_passive=is_passive)

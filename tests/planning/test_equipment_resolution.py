@@ -1,0 +1,200 @@
+import pytest
+
+from classes.Fact import Fact
+from classes.KnowledgeBase import KnowledgeBase
+from classes.Recipe import Recipe
+from classes.WorkingMemory import WorkingMemory
+from planning.classes.CleaningStep import CleaningStep
+from planning.classes.Step import Step
+from planning.engine import PlanningEngine
+from planning.rules.equipment_status import get_equipment_status_rules
+from planning.rules.step_dispatch_rules import get_step_dispatch_rules
+from planning.rules.mixing_dispatch_rules import get_mixing_dispatch_rules
+from planning.rules.transfer_dispatch_rules import get_transfer_dispatch_rules
+from planning.rules.removal_dispatch_rules import get_removal_dispatch_rules
+from planning.rules.surface_transfer_dispatch_rules import get_surface_transfer_dispatch_rules
+from planning.rules.equipment_transfer_dispatch_rules import get_equipment_transfer_dispatch_rules
+from planning.rules.cook_dispatch_rules import get_cook_dispatch_rules
+
+
+def _make_oven_engine(*, state):
+    """Build a minimal PlanningEngine with one OVEN in the given state."""
+    wm = WorkingMemory()
+    wm.add_fact(
+        fact=Fact(
+            fact_title='EQUIPMENT',
+            equipment_name='OVEN',
+            equipment_id=1,
+            state=state,
+        ),
+        silent=True,
+    )
+
+    kb = KnowledgeBase()
+    kb.add_rules(rules=get_equipment_status_rules())
+    kb.add_rules(rules=get_step_dispatch_rules())
+    kb.add_rules(rules=get_mixing_dispatch_rules())
+    kb.add_rules(rules=get_transfer_dispatch_rules())
+    kb.add_rules(rules=get_removal_dispatch_rules())
+    kb.add_rules(rules=get_surface_transfer_dispatch_rules())
+    kb.add_rules(rules=get_equipment_transfer_dispatch_rules())
+    kb.add_rules(rules=get_cook_dispatch_rules())
+
+    recipe = Recipe(
+        name='Test Recipe',
+        ingredients=[],
+        required_equipment=['OVEN'],
+        steps=[
+            Step(
+                description='Bake the item',
+                required_equipment=[{'equipment_name': 'OVEN'}],
+            ),
+        ],
+    )
+
+    engine = PlanningEngine(wm=wm, kb=kb, verbose=False)
+    return engine, wm, recipe
+
+
+class TestEquipmentResolution:
+    def test_oven_available(self):
+        engine, wm, recipe = _make_oven_engine(state='AVAILABLE')
+        success, plan = engine.run(recipe=recipe)
+
+        assert success is True
+        assert len(plan) == 1
+        # State changed to IN_USE
+        assert wm.facts[0].attributes['state'] == 'IN_USE'
+
+    def test_oven_in_use(self):
+        engine, wm, recipe = _make_oven_engine(state='IN_USE')
+        success, error_message = engine.run(recipe=recipe)
+
+        assert success is False
+        assert 'OVEN' in error_message
+
+    def test_oven_dirty(self):
+        engine, wm, recipe = _make_oven_engine(state='DIRTY')
+        success, plan = engine.run(recipe=recipe)
+
+        assert success is True
+        assert len(plan) == 2
+        assert isinstance(plan[0], CleaningStep)
+        assert plan[0].equipment_name == 'OVEN'
+        # State mutated to IN_USE (cleaned, reserved, then in-use)
+        assert wm.facts[0].attributes['state'] == 'IN_USE'
+
+
+def _make_bowl_engine(*, states):
+    """Build a PlanningEngine with N BOWLs in the given states, needing len(states) BOWLs."""
+    wm = WorkingMemory()
+    for i, state in enumerate(states):
+        wm.add_fact(
+            fact=Fact(
+                fact_title='EQUIPMENT',
+                equipment_name='BOWL',
+                equipment_id=i + 1,
+                state=state,
+            ),
+            silent=True,
+        )
+
+    kb = KnowledgeBase()
+    kb.add_rules(rules=get_equipment_status_rules())
+    kb.add_rules(rules=get_step_dispatch_rules())
+    kb.add_rules(rules=get_mixing_dispatch_rules())
+    kb.add_rules(rules=get_transfer_dispatch_rules())
+    kb.add_rules(rules=get_removal_dispatch_rules())
+    kb.add_rules(rules=get_surface_transfer_dispatch_rules())
+    kb.add_rules(rules=get_equipment_transfer_dispatch_rules())
+    kb.add_rules(rules=get_cook_dispatch_rules())
+
+    recipe = Recipe(
+        name='Test Recipe',
+        ingredients=[],
+        required_equipment=['BOWL'],
+        steps=[
+            Step(
+                description='Mix ingredients',
+                required_equipment=[{'equipment_name': 'BOWL', 'required_count': len(states)}],
+            ),
+        ],
+    )
+
+    engine = PlanningEngine(wm=wm, kb=kb, verbose=False)
+    return engine, wm, recipe
+
+
+class TestMultiEquipmentResolution:
+    def test_two_bowls_both_available(self):
+        engine, wm, recipe = _make_bowl_engine(states=['AVAILABLE', 'AVAILABLE'])
+        success, plan = engine.run(recipe=recipe)
+
+        assert success is True
+        assert len(plan) == 1
+        assert wm.facts[0].attributes['state'] == 'IN_USE'
+        assert wm.facts[1].attributes['state'] == 'IN_USE'
+
+    def test_two_bowls_one_dirty_one_available(self):
+        engine, wm, recipe = _make_bowl_engine(states=['DIRTY', 'AVAILABLE'])
+        success, plan = engine.run(recipe=recipe)
+
+        assert success is True
+        assert len(plan) == 2
+        assert isinstance(plan[0], CleaningStep)
+        assert wm.facts[0].attributes['state'] == 'IN_USE'
+        assert wm.facts[1].attributes['state'] == 'IN_USE'
+
+    def test_two_bowls_both_dirty(self):
+        engine, wm, recipe = _make_bowl_engine(states=['DIRTY', 'DIRTY'])
+        success, plan = engine.run(recipe=recipe)
+
+        assert success is True
+        assert len(plan) == 3
+        assert all(isinstance(s, CleaningStep) for s in plan[:2])
+        assert wm.facts[0].attributes['state'] == 'IN_USE'
+        assert wm.facts[1].attributes['state'] == 'IN_USE'
+
+    def test_two_bowls_one_in_use(self):
+        engine, wm, recipe = _make_bowl_engine(states=['AVAILABLE', 'IN_USE'])
+        success, error_message = engine.run(recipe=recipe)
+
+        assert success is False
+        assert 'BOWL' in error_message
+
+
+# ---------------------------------------------------------------------------
+# equipment_cleaned fact derivation
+# ---------------------------------------------------------------------------
+
+class TestEquipmentCleanedFact:
+    def test_equipment_cleaned_fact_on_dirty(self):
+        """equipment_cleaned derived when resolving DIRTY oven."""
+        engine, wm, recipe = _make_oven_engine(state='DIRTY')
+        success, plan = engine.run(recipe=recipe)
+
+        assert success is True
+        ec = wm.query_facts(fact_title='equipment_cleaned')
+        assert len(ec) == 1
+        assert ec[0].attributes['equipment_name'] == 'OVEN'
+        assert ec[0].attributes['equipment_id'] == 1
+
+    def test_no_cleaned_fact_when_available(self):
+        """No equipment_cleaned when oven is already AVAILABLE."""
+        engine, wm, recipe = _make_oven_engine(state='AVAILABLE')
+        success, plan = engine.run(recipe=recipe)
+
+        assert success is True
+        ec = wm.query_facts(fact_title='equipment_cleaned')
+        assert len(ec) == 0
+
+    def test_multiple_dirty_bowls_multiple_cleaned(self):
+        """2 equipment_cleaned facts for 2 DIRTY bowls."""
+        engine, wm, recipe = _make_bowl_engine(states=['DIRTY', 'DIRTY'])
+        success, plan = engine.run(recipe=recipe)
+
+        assert success is True
+        ec = wm.query_facts(fact_title='equipment_cleaned')
+        assert len(ec) == 2
+        names = {f.attributes['equipment_name'] for f in ec}
+        assert names == {'BOWL'}
